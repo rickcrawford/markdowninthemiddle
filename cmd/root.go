@@ -17,6 +17,7 @@ import (
 	"github.com/rickcrawford/markdowninthemiddle/internal/config"
 	"github.com/rickcrawford/markdowninthemiddle/internal/output"
 	"github.com/rickcrawford/markdowninthemiddle/internal/proxy"
+	"github.com/rickcrawford/markdowninthemiddle/internal/templates"
 	"github.com/rickcrawford/markdowninthemiddle/internal/tokens"
 )
 
@@ -44,6 +45,8 @@ func init() {
 	rootCmd.Flags().Bool("tls-insecure", false, "skip TLS certificate verification for upstream requests")
 	rootCmd.Flags().String("output-dir", "", "directory to write converted Markdown files")
 	rootCmd.Flags().Bool("negotiate-only", false, "only convert when client sends Accept: text/markdown")
+	rootCmd.Flags().Bool("convert-json", false, "enable JSON-to-Markdown conversion via Mustache templates")
+	rootCmd.Flags().String("template-dir", "", "directory containing .mustache template files for JSON conversion")
 }
 
 // Execute runs the root command.
@@ -87,6 +90,12 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	if v, _ := cmd.Flags().GetBool("negotiate-only"); v {
 		cfg.Conversion.NegotiateOnly = true
+	}
+	if v, _ := cmd.Flags().GetBool("convert-json"); v {
+		cfg.Conversion.ConvertJSON = true
+	}
+	if v, _ := cmd.Flags().GetString("template-dir"); v != "" {
+		cfg.Conversion.TemplateDir = v
 	}
 
 	// Token counter.
@@ -132,6 +141,20 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Printf("Markdown output enabled: %s", cfg.Output.Dir)
 	}
 
+	// Template store for JSON-to-Markdown conversion.
+	var templateStore *templates.Store
+	if cfg.Conversion.TemplateDir != "" {
+		templateStore, err = templates.New(cfg.Conversion.TemplateDir)
+		if err != nil {
+			return fmt.Errorf("loading templates: %w", err)
+		}
+		log.Printf("Mustache templates loaded from: %s", cfg.Conversion.TemplateDir)
+	}
+
+	if cfg.Conversion.ConvertJSON {
+		log.Println("JSON-to-Markdown conversion enabled")
+	}
+
 	if cfg.TLS.Insecure {
 		log.Println("WARNING: TLS certificate verification disabled for upstream requests")
 	}
@@ -142,12 +165,14 @@ func run(cmd *cobra.Command, args []string) error {
 		WriteTimeout: cfg.Proxy.WriteTimeout,
 		TLSConfig:    tlsCfg,
 		ConvertHTML:   cfg.Conversion.Enabled,
+		ConvertJSON:   cfg.Conversion.ConvertJSON,
 		NegotiateOnly: cfg.Conversion.NegotiateOnly,
 		MaxBodySize:   cfg.MaxBodySize,
 		TLSInsecure:  cfg.TLS.Insecure,
 		TokenCounter: tokenCounter,
-		Cache:        diskCache,
-		OutputWriter: outputWriter,
+		Cache:         diskCache,
+		OutputWriter:  outputWriter,
+		TemplateStore: templateStore,
 	}
 
 	srv := proxy.New(opts)

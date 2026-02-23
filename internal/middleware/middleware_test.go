@@ -258,6 +258,127 @@ func TestWantsMarkdown(t *testing.T) {
 	}
 }
 
+func TestResponseProcessor_JSONToMarkdown(t *testing.T) {
+	tc, _ := tokens.NewCounter("cl100k_base")
+
+	rp := &ResponseProcessor{
+		ConvertJSON:  true,
+		TokenCounter: tc,
+		Inner: &mockTransport{
+			statusCode:  200,
+			contentType: "application/json",
+			body:        `{"title":"Hello","items":["one","two","three"]}`,
+		},
+	}
+
+	req, _ := http.NewRequest("GET", "http://example.com/api", nil)
+	resp, err := rp.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	md := string(body)
+
+	if !strings.Contains(md, "## title") {
+		t.Errorf("expected '## title' heading, got %q", md)
+	}
+	if !strings.Contains(md, "Hello") {
+		t.Errorf("expected 'Hello' value, got %q", md)
+	}
+	if !strings.Contains(md, "- one") {
+		t.Errorf("expected '- one' bullet, got %q", md)
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if !strings.Contains(ct, "text/markdown") {
+		t.Errorf("expected text/markdown, got %q", ct)
+	}
+
+	vary := resp.Header.Get("Vary")
+	if vary != "accept" {
+		t.Errorf("expected Vary: accept, got %q", vary)
+	}
+}
+
+func TestResponseProcessor_JSONPassThrough_WhenDisabled(t *testing.T) {
+	rp := &ResponseProcessor{
+		ConvertHTML: true,
+		ConvertJSON: false,
+		Inner: &mockTransport{
+			statusCode:  200,
+			contentType: "application/json",
+			body:        `{"key":"value"}`,
+		},
+	}
+
+	req, _ := http.NewRequest("GET", "http://example.com/api", nil)
+	resp, err := rp.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != `{"key":"value"}` {
+		t.Errorf("expected JSON pass-through, got %q", body)
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("expected application/json, got %q", ct)
+	}
+}
+
+func TestResponseProcessor_JSONNegotiateOnly(t *testing.T) {
+	rp := &ResponseProcessor{
+		ConvertJSON:   true,
+		NegotiateOnly: true,
+		Inner: &mockTransport{
+			statusCode:  200,
+			contentType: "application/json",
+			body:        `{"key":"value"}`,
+		},
+	}
+
+	// Without Accept: text/markdown — should pass through.
+	req, _ := http.NewRequest("GET", "http://example.com/api", nil)
+	resp, err := rp.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != `{"key":"value"}` {
+		t.Errorf("expected JSON pass-through without Accept header, got %q", body)
+	}
+
+	// With Accept: text/markdown — should convert.
+	rp2 := &ResponseProcessor{
+		ConvertJSON:   true,
+		NegotiateOnly: true,
+		Inner: &mockTransport{
+			statusCode:  200,
+			contentType: "application/json",
+			body:        `{"key":"value"}`,
+		},
+	}
+	req2, _ := http.NewRequest("GET", "http://example.com/api", nil)
+	req2.Header.Set("Accept", "text/markdown")
+	resp2, err := rp2.RoundTrip(req2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer resp2.Body.Close()
+
+	ct := resp2.Header.Get("Content-Type")
+	if !strings.Contains(ct, "text/markdown") {
+		t.Errorf("expected text/markdown with Accept header, got %q", ct)
+	}
+}
+
 func BenchmarkResponseProcessor_HTMLToMarkdown(b *testing.B) {
 	tc, _ := tokens.NewCounter("cl100k_base")
 

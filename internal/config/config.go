@@ -37,6 +37,8 @@ type ConversionConfig struct {
 	Enabled          bool   `mapstructure:"enabled"`
 	TiktokenEncoding string `mapstructure:"tiktoken_encoding"`
 	NegotiateOnly    bool   `mapstructure:"negotiate_only"`
+	ConvertJSON      bool   `mapstructure:"convert_json"`
+	TemplateDir      string `mapstructure:"template_dir"`
 }
 
 type CacheConfig struct {
@@ -79,6 +81,8 @@ func Load(cfgFile string) (*Config, error) {
 	viper.SetDefault("conversion.enabled", true)
 	viper.SetDefault("conversion.tiktoken_encoding", "cl100k_base")
 	viper.SetDefault("conversion.negotiate_only", false)
+	viper.SetDefault("conversion.convert_json", false)
+	viper.SetDefault("conversion.template_dir", "")
 	viper.SetDefault("max_body_size", 10485760)
 	viper.SetDefault("cache.enabled", false)
 	viper.SetDefault("cache.respect_headers", true)
