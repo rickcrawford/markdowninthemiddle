@@ -29,6 +29,7 @@ type TLSConfig struct {
 	AutoCert     bool   `mapstructure:"auto_cert"`
 	AutoCertHost string `mapstructure:"auto_cert_host"`
 	AutoCertDir  string `mapstructure:"auto_cert_dir"`
+	Insecure     bool   `mapstructure:"insecure"`
 }
 
 type ConversionConfig struct {
@@ -67,6 +68,7 @@ func Load(cfgFile string) (*Config, error) {
 	viper.SetDefault("tls.auto_cert", true)
 	viper.SetDefault("tls.auto_cert_host", "localhost")
 	viper.SetDefault("tls.auto_cert_dir", "./certs")
+	viper.SetDefault("tls.insecure", false)
 	viper.SetDefault("conversion.enabled", true)
 	viper.SetDefault("conversion.tiktoken_encoding", "cl100k_base")
 	viper.SetDefault("max_body_size", 10485760)

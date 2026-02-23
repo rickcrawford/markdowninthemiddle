@@ -26,6 +26,7 @@ type Options struct {
 
 	ConvertHTML bool
 	MaxBodySize int64
+	TLSInsecure bool
 
 	TokenCounter *tokens.Counter
 	Cache        *cache.DiskCache
@@ -51,8 +52,8 @@ func New(opts Options) *http.Server {
 		Cache:        opts.Cache,
 		Inner: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				// As a forward proxy we trust upstream certs normally.
-				MinVersion: tls.VersionTLS12,
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: opts.TLSInsecure,
 			},
 			DisableCompression: false,
 			IdleConnTimeout:    90 * time.Second,

@@ -21,6 +21,8 @@ tls:
   # Self-signed cert options
   auto_cert_host: "localhost"
   auto_cert_dir: "./certs"
+  # Skip TLS certificate verification for upstream requests
+  insecure: false
 
 # Conversion settings
 conversion:

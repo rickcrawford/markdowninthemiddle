@@ -40,6 +40,7 @@ func init() {
 	rootCmd.Flags().Bool("auto-cert", false, "auto-generate self-signed certificate (overrides config)")
 	rootCmd.Flags().String("cache-dir", "", "cache directory for HTML responses (overrides config)")
 	rootCmd.Flags().Int64("max-body-size", 0, "max response body size in bytes (overrides config)")
+	rootCmd.Flags().Bool("tls-insecure", false, "skip TLS certificate verification for upstream requests")
 }
 
 // Execute runs the root command.
@@ -73,6 +74,9 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	if v, _ := cmd.Flags().GetInt64("max-body-size"); v > 0 {
 		cfg.MaxBodySize = v
+	}
+	if v, _ := cmd.Flags().GetBool("tls-insecure"); v {
+		cfg.TLS.Insecure = true
 	}
 
 	// Token counter.
@@ -108,6 +112,10 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Println("TLS enabled on proxy listener")
 	}
 
+	if cfg.TLS.Insecure {
+		log.Println("WARNING: TLS certificate verification disabled for upstream requests")
+	}
+
 	opts := proxy.Options{
 		Addr:         cfg.Proxy.Addr,
 		ReadTimeout:  cfg.Proxy.ReadTimeout,
@@ -115,6 +123,7 @@ func run(cmd *cobra.Command, args []string) error {
 		TLSConfig:    tlsCfg,
 		ConvertHTML:  cfg.Conversion.Enabled,
 		MaxBodySize:  cfg.MaxBodySize,
+		TLSInsecure:  cfg.TLS.Insecure,
 		TokenCounter: tokenCounter,
 		Cache:        diskCache,
 	}
