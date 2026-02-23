@@ -15,6 +15,7 @@ import (
 	"github.com/rickcrawford/markdowninthemiddle/internal/cache"
 	"github.com/rickcrawford/markdowninthemiddle/internal/certs"
 	"github.com/rickcrawford/markdowninthemiddle/internal/config"
+	"github.com/rickcrawford/markdowninthemiddle/internal/output"
 	"github.com/rickcrawford/markdowninthemiddle/internal/proxy"
 	"github.com/rickcrawford/markdowninthemiddle/internal/tokens"
 )
@@ -41,6 +42,8 @@ func init() {
 	rootCmd.Flags().String("cache-dir", "", "cache directory for HTML responses (overrides config)")
 	rootCmd.Flags().Int64("max-body-size", 0, "max response body size in bytes (overrides config)")
 	rootCmd.Flags().Bool("tls-insecure", false, "skip TLS certificate verification for upstream requests")
+	rootCmd.Flags().String("output-dir", "", "directory to write converted Markdown files")
+	rootCmd.Flags().Bool("negotiate-only", false, "only convert when client sends Accept: text/markdown")
 }
 
 // Execute runs the root command.
@@ -78,6 +81,13 @@ func run(cmd *cobra.Command, args []string) error {
 	if v, _ := cmd.Flags().GetBool("tls-insecure"); v {
 		cfg.TLS.Insecure = true
 	}
+	if v, _ := cmd.Flags().GetString("output-dir"); v != "" {
+		cfg.Output.Dir = v
+		cfg.Output.Enabled = true
+	}
+	if v, _ := cmd.Flags().GetBool("negotiate-only"); v {
+		cfg.Conversion.NegotiateOnly = true
+	}
 
 	// Token counter.
 	tokenCounter, err := tokens.NewCounter(cfg.Conversion.TiktokenEncoding)
@@ -112,6 +122,16 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Println("TLS enabled on proxy listener")
 	}
 
+	// Markdown output writer.
+	var outputWriter *output.Writer
+	if cfg.Output.Enabled && cfg.Output.Dir != "" {
+		outputWriter, err = output.New(cfg.Output.Dir)
+		if err != nil {
+			return fmt.Errorf("initializing output writer: %w", err)
+		}
+		log.Printf("Markdown output enabled: %s", cfg.Output.Dir)
+	}
+
 	if cfg.TLS.Insecure {
 		log.Println("WARNING: TLS certificate verification disabled for upstream requests")
 	}
@@ -121,11 +141,13 @@ func run(cmd *cobra.Command, args []string) error {
 		ReadTimeout:  cfg.Proxy.ReadTimeout,
 		WriteTimeout: cfg.Proxy.WriteTimeout,
 		TLSConfig:    tlsCfg,
-		ConvertHTML:  cfg.Conversion.Enabled,
-		MaxBodySize:  cfg.MaxBodySize,
+		ConvertHTML:   cfg.Conversion.Enabled,
+		NegotiateOnly: cfg.Conversion.NegotiateOnly,
+		MaxBodySize:   cfg.MaxBodySize,
 		TLSInsecure:  cfg.TLS.Insecure,
 		TokenCounter: tokenCounter,
 		Cache:        diskCache,
+		OutputWriter: outputWriter,
 	}
 
 	srv := proxy.New(opts)

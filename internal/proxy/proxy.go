@@ -13,6 +13,7 @@ import (
 
 	"github.com/rickcrawford/markdowninthemiddle/internal/cache"
 	"github.com/rickcrawford/markdowninthemiddle/internal/middleware"
+	"github.com/rickcrawford/markdowninthemiddle/internal/output"
 	"github.com/rickcrawford/markdowninthemiddle/internal/tokens"
 )
 
@@ -24,12 +25,14 @@ type Options struct {
 
 	TLSConfig *tls.Config
 
-	ConvertHTML bool
-	MaxBodySize int64
-	TLSInsecure bool
+	ConvertHTML   bool
+	NegotiateOnly bool
+	MaxBodySize   int64
+	TLSInsecure   bool
 
 	TokenCounter *tokens.Counter
 	Cache        *cache.DiskCache
+	OutputWriter *output.Writer
 }
 
 // New creates an *http.Server configured as a forward proxy.
@@ -46,10 +49,12 @@ func New(opts Options) *http.Server {
 
 	// The response-processing transport wraps the default transport.
 	transport := &middleware.ResponseProcessor{
-		MaxBodySize:  opts.MaxBodySize,
-		ConvertHTML:  opts.ConvertHTML,
-		TokenCounter: opts.TokenCounter,
+		MaxBodySize:   opts.MaxBodySize,
+		ConvertHTML:   opts.ConvertHTML,
+		NegotiateOnly: opts.NegotiateOnly,
+		TokenCounter:  opts.TokenCounter,
 		Cache:        opts.Cache,
+		OutputWriter: opts.OutputWriter,
 		Inner: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				MinVersion:         tls.VersionTLS12,

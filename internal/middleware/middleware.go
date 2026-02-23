@@ -9,6 +9,7 @@ import (
 
 	"github.com/rickcrawford/markdowninthemiddle/internal/cache"
 	"github.com/rickcrawford/markdowninthemiddle/internal/converter"
+	"github.com/rickcrawford/markdowninthemiddle/internal/output"
 	"github.com/rickcrawford/markdowninthemiddle/internal/tokens"
 )
 
@@ -19,12 +20,28 @@ type ResponseProcessor struct {
 	MaxBodySize int64
 	// ConvertHTML controls whether HTML responses are converted to Markdown.
 	ConvertHTML bool
+	// NegotiateOnly when true only converts when the client sends Accept: text/markdown.
+	NegotiateOnly bool
 	// TokenCounter counts tokens on converted markdown responses.
 	TokenCounter *tokens.Counter
 	// Cache stores HTML responses to disk.
 	Cache *cache.DiskCache
+	// OutputWriter writes converted Markdown files to a directory.
+	OutputWriter *output.Writer
 	// Inner is the actual transport used to make requests.
 	Inner http.RoundTripper
+}
+
+// wantsMarkdown checks if the request Accept header includes text/markdown.
+func wantsMarkdown(req *http.Request) bool {
+	accept := req.Header.Get("Accept")
+	for _, part := range strings.Split(accept, ",") {
+		mediaType := strings.TrimSpace(strings.SplitN(part, ";", 2)[0])
+		if strings.EqualFold(mediaType, "text/markdown") {
+			return true
+		}
+	}
+	return false
 }
 
 // RoundTrip implements http.RoundTripper. It delegates to the inner transport,
@@ -39,6 +56,12 @@ func (rp *ResponseProcessor) RoundTrip(req *http.Request) (*http.Response, error
 	ct := resp.Header.Get("Content-Type")
 	if !converter.IsHTMLContentType(ct) {
 		return resp, nil
+	}
+
+	// Determine whether to convert this response.
+	shouldConvert := rp.ConvertHTML
+	if rp.NegotiateOnly {
+		shouldConvert = wantsMarkdown(req)
 	}
 
 	// Decompress encoded body.
@@ -75,7 +98,7 @@ func (rp *ResponseProcessor) RoundTrip(req *http.Request) (*http.Response, error
 	}
 
 	// Convert HTML to Markdown.
-	if rp.ConvertHTML {
+	if shouldConvert {
 		md, err := converter.HTMLToMarkdown(htmlStr)
 		if err != nil {
 			log.Printf("html-to-markdown conversion error: %v", err)
@@ -91,12 +114,22 @@ func (rp *ResponseProcessor) RoundTrip(req *http.Request) (*http.Response, error
 			resp.Header.Set("X-Token-Count", strconv.Itoa(count))
 		}
 
+		// Write converted Markdown to output directory if configured.
+		if rp.OutputWriter != nil {
+			if err := rp.OutputWriter.Write(req.URL.String(), []byte(md)); err != nil {
+				log.Printf("output write error: %v", err)
+			}
+		}
+
 		// Replace response body with Markdown.
 		resp.Body = io.NopCloser(strings.NewReader(md))
 		resp.ContentLength = int64(len(md))
 		resp.Header.Set("Content-Type", "text/markdown; charset=utf-8")
 		resp.Header.Del("Content-Encoding")
 		resp.Header.Set("Content-Length", strconv.Itoa(len(md)))
+		// Signal that the response varies based on the Accept header,
+		// consistent with Cloudflare's Markdown for Agents approach.
+		resp.Header.Set("Vary", "accept")
 
 		return resp, nil
 	}

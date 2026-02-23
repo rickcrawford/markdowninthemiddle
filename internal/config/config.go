@@ -13,6 +13,7 @@ type Config struct {
 	Conversion  ConversionConfig `mapstructure:"conversion"`
 	MaxBodySize int64            `mapstructure:"max_body_size"`
 	Cache       CacheConfig      `mapstructure:"cache"`
+	Output      OutputConfig     `mapstructure:"output"`
 	LogLevel    string           `mapstructure:"log_level"`
 }
 
@@ -35,12 +36,18 @@ type TLSConfig struct {
 type ConversionConfig struct {
 	Enabled          bool   `mapstructure:"enabled"`
 	TiktokenEncoding string `mapstructure:"tiktoken_encoding"`
+	NegotiateOnly    bool   `mapstructure:"negotiate_only"`
 }
 
 type CacheConfig struct {
 	Enabled        bool   `mapstructure:"enabled"`
 	Dir            string `mapstructure:"dir"`
 	RespectHeaders bool   `mapstructure:"respect_headers"`
+}
+
+type OutputConfig struct {
+	Enabled bool   `mapstructure:"enabled"`
+	Dir     string `mapstructure:"dir"`
 }
 
 // Load reads configuration from the given file path (or default locations)
@@ -71,9 +78,12 @@ func Load(cfgFile string) (*Config, error) {
 	viper.SetDefault("tls.insecure", false)
 	viper.SetDefault("conversion.enabled", true)
 	viper.SetDefault("conversion.tiktoken_encoding", "cl100k_base")
+	viper.SetDefault("conversion.negotiate_only", false)
 	viper.SetDefault("max_body_size", 10485760)
 	viper.SetDefault("cache.enabled", false)
 	viper.SetDefault("cache.respect_headers", true)
+	viper.SetDefault("output.enabled", false)
+	viper.SetDefault("output.dir", "")
 	viper.SetDefault("log_level", "info")
 
 	if err := viper.ReadInConfig(); err != nil {

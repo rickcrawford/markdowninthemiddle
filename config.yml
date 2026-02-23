@@ -30,6 +30,8 @@ conversion:
   enabled: true
   # TikToken encoding for token counting
   tiktoken_encoding: "cl100k_base"
+  # Only convert when client sends Accept: text/markdown (content negotiation mode)
+  negotiate_only: false
 
 # Response body size limit (bytes). 0 = unlimited.
 max_body_size: 10485760  # 10 MB
@@ -42,6 +44,13 @@ cache:
   dir: ""
   # Respect RFC cache-control headers
   respect_headers: true
+
+# Output settings - write converted Markdown to files
+output:
+  # Enable writing Markdown output files
+  enabled: false
+  # Directory to write .md files (file-safe names derived from URL)
+  dir: ""
 
 # Logging
 log_level: "info"
