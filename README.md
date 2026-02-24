@@ -31,6 +31,25 @@ Perfect for feeding web content to Claude, local LLMs, and AI agents. Works on i
 
 ---
 
+## About
+
+**Markdown in the Middle** is inspired by [Cloudflare's Markdown for Agents](https://blog.cloudflare.com/markdown-for-agents/). While Cloudflare's solution handles the edge, this project brings HTML-to-Markdown conversion to:
+
+- 🏢 Internal networks and private services
+- 🔒 Staging/testing environments with self-signed certs
+- 🤖 Local LLM deployments
+- 🔌 Private APIs without external dependencies
+
+It's production-ready with full Docker support, MCP integration for Claude Desktop, and optional JavaScript rendering for dynamic content.
+
+---
+
+## Author
+
+**Rick Crawford** - [LinkedIn](https://linkedin.com/in/rickcrawford)
+
+---
+
 ## ✨ Key Features
 
 | Feature | Details |
@@ -251,27 +270,6 @@ All options support CLI flags, environment variables (`MITM_*`), or `config.yml`
 
 ---
 
-## About
-
-**Markdown in the Middle** is inspired by [Cloudflare's Markdown for Agents](https://blog.cloudflare.com/markdown-for-agents/). While Cloudflare's solution handles the edge, this project brings HTML-to-Markdown conversion to:
-
-- 🏢 Internal networks and private services
-- 🔒 Staging/testing environments with self-signed certs
-- 🤖 Local LLM deployments
-- 🔌 Private APIs without external dependencies
-
-It's production-ready with full Docker support, MCP integration for Claude Desktop, and optional JavaScript rendering for dynamic content.
-
----
-
-## Author
-
-**Rick Crawford** - [GitHub](https://github.com/rickcrawford) | [Website](https://rickcrawford.dev)
-
-Building tools for AI integration, local LLM workflows, and intelligent content processing. Open to collaboration on AI-adjacent projects.
-
----
-
 ## Contributing
 
 Contributions welcome! Please:
@@ -281,15 +279,12 @@ Contributions welcome! Please:
 3. Add tests for new functionality
 4. Submit a pull request
 
-See [CLAUDE.md](./CLAUDE.md) for development guidelines.
-
 ---
 
 ## Support
 
 - 📖 **Documentation** - See the [docs](./docs) folder for comprehensive guides
 - 🐛 **Bug Reports** - [GitHub Issues](https://github.com/rickcrawford/markdowninthemiddle/issues)
-- 💬 **Discussions** - [GitHub Discussions](https://github.com/rickcrawford/markdowninthemiddle/discussions)
 - 🔧 **Quick Help** - Start with [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)
 
 ---
