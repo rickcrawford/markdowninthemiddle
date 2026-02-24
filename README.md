@@ -1,4 +1,3 @@
-# Markdown in the Middle
 
 ```
  ███╗   ███╗ █████╗ ██████╗ ██╗  ██╗██████╗  ██████╗ ██╗    ██╗███╗   ██╗
@@ -23,15 +22,10 @@
 
 **An intelligent forward proxy that converts HTML & JSON to Markdown in real-time, with optional JavaScript rendering for dynamic content.**
 
-Perfect for feeding web content to Claude, local LLMs, and AI agents. Works on internal networks where Cloudflare isn't available.
-
 [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen?style=flat-square)](/)
 
 ---
-
-## About
 
 **Markdown in the Middle** is inspired by [Cloudflare's Markdown for Agents](https://blog.cloudflare.com/markdown-for-agents/). While Cloudflare's solution handles the edge, this project brings HTML-to-Markdown conversion to:
 
