@@ -35,6 +35,8 @@ type ResponseProcessor struct {
 	TemplateStore *templates.Store
 	// Inner is the actual transport used to make requests.
 	Inner http.RoundTripper
+	// TransportType is the type of transport used (http or chrome).
+	TransportType string
 }
 
 // wantsMarkdown checks if the request Accept header includes text/markdown.
@@ -58,6 +60,11 @@ func (rp *ResponseProcessor) RoundTrip(req *http.Request) (*http.Response, error
 	resp, err := rp.Inner.RoundTrip(req)
 	if err != nil {
 		return resp, err
+	}
+
+	// Add transport type header
+	if rp.TransportType != "" {
+		resp.Header.Set("X-Transport", rp.TransportType)
 	}
 
 	ct := resp.Header.Get("Content-Type")

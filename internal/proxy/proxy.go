@@ -12,6 +12,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/rickcrawford/markdowninthemiddle/internal/cache"
+	"github.com/rickcrawford/markdowninthemiddle/internal/filter"
 	"github.com/rickcrawford/markdowninthemiddle/internal/middleware"
 	"github.com/rickcrawford/markdowninthemiddle/internal/output"
 	"github.com/rickcrawford/markdowninthemiddle/internal/templates"
@@ -36,6 +37,9 @@ type Options struct {
 	Cache         *cache.DiskCache
 	OutputWriter  *output.Writer
 	TemplateStore *templates.Store
+	Filter        *filter.Filter
+	Transport     http.RoundTripper
+	TransportType string // "http" or "chrome"
 }
 
 // New creates an *http.Server configured as a forward proxy.
@@ -46,11 +50,31 @@ func New(opts Options) *http.Server {
 
 	// Chi middleware for the proxy's own request handling.
 	r.Use(chimw.RealIP)
-	r.Use(chimw.Logger)
+	r.Use(middleware.LoggerMiddleware)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RequestID)
 
-	// The response-processing transport wraps the default transport.
+	// Inject filter middleware if configured
+	if opts.Filter != nil {
+		r.Use(opts.Filter.Middleware)
+	}
+
+	// Select inner transport
+	var innerTransport http.RoundTripper
+	if opts.Transport != nil {
+		innerTransport = opts.Transport
+	} else {
+		innerTransport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: opts.TLSInsecure,
+			},
+			DisableCompression: false,
+			IdleConnTimeout:    90 * time.Second,
+		}
+	}
+
+	// The response-processing transport wraps the selected transport.
 	transport := &middleware.ResponseProcessor{
 		MaxBodySize:   opts.MaxBodySize,
 		ConvertHTML:   opts.ConvertHTML,
@@ -60,14 +84,8 @@ func New(opts Options) *http.Server {
 		Cache:         opts.Cache,
 		OutputWriter:  opts.OutputWriter,
 		TemplateStore: opts.TemplateStore,
-		Inner: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				MinVersion:         tls.VersionTLS12,
-				InsecureSkipVerify: opts.TLSInsecure,
-			},
-			DisableCompression: false,
-			IdleConnTimeout:    90 * time.Second,
-		},
+		Inner:         innerTransport,
+		TransportType: opts.TransportType,
 	}
 
 	// CONNECT handler for HTTPS tunneling.

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log"
@@ -8,13 +9,16 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/rickcrawford/markdowninthemiddle/internal/banner"
+	"github.com/rickcrawford/markdowninthemiddle/internal/browser"
 	"github.com/rickcrawford/markdowninthemiddle/internal/cache"
 	"github.com/rickcrawford/markdowninthemiddle/internal/certs"
 	"github.com/rickcrawford/markdowninthemiddle/internal/config"
+	"github.com/rickcrawford/markdowninthemiddle/internal/filter"
 	"github.com/rickcrawford/markdowninthemiddle/internal/output"
 	"github.com/rickcrawford/markdowninthemiddle/internal/proxy"
 	"github.com/rickcrawford/markdowninthemiddle/internal/templates"
@@ -47,6 +51,8 @@ func init() {
 	rootCmd.Flags().Bool("negotiate-only", false, "only convert when client sends Accept: text/markdown")
 	rootCmd.Flags().Bool("convert-json", false, "enable JSON-to-Markdown conversion via Mustache templates")
 	rootCmd.Flags().String("template-dir", "", "directory containing .mustache template files for JSON conversion")
+	rootCmd.Flags().String("transport", "", "transport type: http (standard reverse proxy) or chromedp (headless Chrome rendering)")
+	rootCmd.Flags().StringSlice("allow", []string{}, "regex patterns for allowed URLs (repeatable)")
 }
 
 // Execute runs the root command.
@@ -96,6 +102,12 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	if v, _ := cmd.Flags().GetString("template-dir"); v != "" {
 		cfg.Conversion.TemplateDir = v
+	}
+	if v, _ := cmd.Flags().GetString("transport"); v != "" {
+		cfg.Transport.Type = v
+	}
+	if v, _ := cmd.Flags().GetStringSlice("allow"); len(v) > 0 {
+		cfg.Filter.Allowed = v
 	}
 
 	// Token counter.
@@ -159,6 +171,45 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Println("WARNING: TLS certificate verification disabled for upstream requests")
 	}
 
+	// Compile request filter if patterns are specified
+	var reqFilter *filter.Filter
+	if len(cfg.Filter.Allowed) > 0 {
+		reqFilter, err = filter.New(cfg.Filter.Allowed)
+		if err != nil {
+			return fmt.Errorf("compiling request filter: %w", err)
+		}
+		log.Printf("Request filter enabled with %d pattern(s)", len(cfg.Filter.Allowed))
+	}
+
+	// Initialize browser pool if chromedp transport is configured
+	ctx := context.Background()
+	var chromePool http.RoundTripper
+
+	if cfg.Transport.Type == "chromedp" {
+		log.Println("chromedp transport enabled. Connecting to Chrome...")
+		chromeURL := cfg.Transport.Chromedp.URL
+		if chromeURL == "" {
+			chromeURL = "http://localhost:9222"
+		}
+
+		chromePool, err = browser.New(ctx, chromeURL, cfg.Transport.Chromedp.PoolSize, 30*time.Second)
+		if err != nil {
+			log.Printf("ERROR: Failed to connect to Chrome at %s: %v", chromeURL, err)
+			log.Println("\nTo use chromedp transport, start Chrome with:")
+			log.Println("  macOS:   /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --headless --disable-gpu --remote-debugging-port=9222")
+			log.Println("  Linux:   chromium-browser --headless --disable-gpu --remote-debugging-port=9222")
+			log.Println("  Windows: chrome.exe --headless --disable-gpu --remote-debugging-port=9222")
+			log.Println("  Docker:  docker compose up -d")
+			return fmt.Errorf("chromedp transport enabled but Chrome is not running at %s", chromeURL)
+		}
+		log.Printf("✅ chromedp browser pool ready (size: %d, URL: %s)", cfg.Transport.Chromedp.PoolSize, chromeURL)
+	}
+
+	transportType := "http"
+	if chromePool != nil {
+		transportType = "chrome"
+	}
+
 	opts := proxy.Options{
 		Addr:         cfg.Proxy.Addr,
 		ReadTimeout:  cfg.Proxy.ReadTimeout,
@@ -173,22 +224,38 @@ func run(cmd *cobra.Command, args []string) error {
 		Cache:         diskCache,
 		OutputWriter:  outputWriter,
 		TemplateStore: templateStore,
+		Filter:        reqFilter,
+		Transport:     chromePool,
+		TransportType: transportType,
 	}
 
 	srv := proxy.New(opts)
+
+	// Schedule cleanup of browser pool on shutdown
+	var browserPoolCleanup func()
+	if chromePool != nil {
+		if pool, ok := chromePool.(*browser.Pool); ok {
+			browserPoolCleanup = func() { pool.Close() }
+		}
+	}
 
 	// Graceful shutdown on SIGINT/SIGTERM.
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
+	log.Printf("starting proxy on %s (TLS: %v, convert: %v, max body: %d bytes)",
+		cfg.Proxy.Addr, cfg.TLS.Enabled, cfg.Conversion.Enabled, cfg.MaxBodySize)
+
+	// Graceful shutdown on SIGINT/SIGTERM.
 	go func() {
 		<-quit
 		log.Println("shutting down proxy...")
+		if browserPoolCleanup != nil {
+			log.Println("closing browser pool...")
+			browserPoolCleanup()
+		}
 		srv.Close()
 	}()
-
-	log.Printf("starting proxy on %s (TLS: %v, convert: %v, max body: %d bytes)",
-		cfg.Proxy.Addr, cfg.TLS.Enabled, cfg.Conversion.Enabled, cfg.MaxBodySize)
 
 	if cfg.TLS.Enabled {
 		// TLS cert/key are already loaded into TLSConfig; use empty strings.
@@ -196,6 +263,7 @@ func run(cmd *cobra.Command, args []string) error {
 	} else {
 		err = srv.ListenAndServe()
 	}
+
 	if err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server error: %w", err)
 	}

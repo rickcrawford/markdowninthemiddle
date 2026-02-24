@@ -52,5 +52,33 @@ output:
   # Directory to write .md files (file-safe names derived from URL)
   dir: ""
 
+# Transport settings
+transport:
+  # Transport type for fetching upstream content
+  # "http" (default) - standard net/http transport (reverse proxy behavior)
+  # "chromedp" - headless Chrome via Chrome DevTools Protocol (JavaScript rendering)
+  type: "http"
+  # chromedp transport configuration (only used when type: "chromedp")
+  chromedp:
+    # Chrome DevTools Protocol URL
+    # Default: http://localhost:9222
+    # Use Docker: http://chrome:9222 (when running proxy in docker-compose)
+    # Use local Chrome: http://localhost:9222 (if Chrome running on host)
+    url: "http://localhost:9222"
+    # Max concurrent tabs in the browser pool (default: 5)
+    pool_size: 5
+
+# Request filtering - restrict which URLs the proxy will handle
+filter:
+  # List of Go regex patterns. If non-empty, only matching URLs are proxied.
+  # Empty list = allow all requests.
+  # Each pattern is matched against the full URL (scheme://host/path?query)
+  allowed: []
+  # Examples:
+  #   - "^https://api\\.example\\.com/"          # Allow specific API domain
+  #   - "^https://(www\\.)?example\\.com/docs/"  # Allow docs on example.com or www.example.com
+  #   - "^https://example\\.com"                 # Allow all on example.com
+  # Non-matching URLs return HTTP 403 Forbidden
+
 # Logging
 log_level: "info"

@@ -1,0 +1,49 @@
+services:
+  chrome:
+    image: chromedp/headless-shell:latest
+    container_name: markdowninthemiddle-chrome
+    ports:
+      - "9222:9222"
+    shm_size: "2gb"
+    init: true
+    restart: unless-stopped
+    environment:
+      HEADLESS_SHELL_ARGS: "--no-sandbox --disable-gpu"
+    networks:
+      - mitm
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: markdowninthemiddle-proxy
+    ports:
+      - "8080:8080"      # Proxy (HTTP or HTTPS depending on --tls flag)
+    volumes:
+      - ./config.yml:/etc/markdowninthemiddle/config.yml:ro
+      - ./certs:/etc/markdowninthemiddle/certs
+      - ./output:/var/log/markdowninthemiddle/output
+    environment:
+      MITM_CONFIG: "/etc/markdowninthemiddle/config.yml"
+      MITM_PROXY_ADDR: "0.0.0.0:8080"
+      MITM_TLS_ENABLED: "true"
+      MITM_TLS_AUTO_CERT: "true"
+      MITM_TRANSPORT_TYPE: "chromedp"
+      MITM_TRANSPORT_CHROMEDP_URL: "http://chrome:9222"
+      MITM_CONVERSION_ENABLED: "true"
+      MITM_LOG_LEVEL: "info"
+    depends_on:
+      chrome:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - mitm
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  mitm:
+    driver: bridge

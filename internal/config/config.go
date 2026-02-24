@@ -15,6 +15,8 @@ type Config struct {
 	Cache       CacheConfig      `mapstructure:"cache"`
 	Output      OutputConfig     `mapstructure:"output"`
 	LogLevel    string           `mapstructure:"log_level"`
+	Transport   TransportConfig  `mapstructure:"transport"`
+	Filter      FilterConfig     `mapstructure:"filter"`
 }
 
 type ProxyConfig struct {
@@ -50,6 +52,20 @@ type CacheConfig struct {
 type OutputConfig struct {
 	Enabled bool   `mapstructure:"enabled"`
 	Dir     string `mapstructure:"dir"`
+}
+
+type TransportConfig struct {
+	Type     string           `mapstructure:"type"`
+	Chromedp ChromedpConfig   `mapstructure:"chromedp"`
+}
+
+type ChromedpConfig struct {
+	URL      string `mapstructure:"url"`
+	PoolSize int    `mapstructure:"pool_size"`
+}
+
+type FilterConfig struct {
+	Allowed []string `mapstructure:"allowed"`
 }
 
 // Load reads configuration from the given file path (or default locations)
@@ -89,6 +105,9 @@ func Load(cfgFile string) (*Config, error) {
 	viper.SetDefault("output.enabled", false)
 	viper.SetDefault("output.dir", "")
 	viper.SetDefault("log_level", "info")
+	viper.SetDefault("transport.type", "http")
+	viper.SetDefault("transport.chromedp.url", "http://localhost:9222")
+	viper.SetDefault("transport.chromedp.pool_size", 5)
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
