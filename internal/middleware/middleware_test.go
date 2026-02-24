@@ -300,6 +300,15 @@ func TestResponseProcessor_JSONToMarkdown(t *testing.T) {
 	if vary != "accept" {
 		t.Errorf("expected Vary: accept, got %q", vary)
 	}
+
+	// Verify token count is in response header
+	tokenCount := resp.Header.Get("X-Token-Count")
+	if tokenCount == "" {
+		t.Errorf("expected X-Token-Count header, got empty")
+	}
+	if _, err := strconv.Atoi(tokenCount); err != nil {
+		t.Errorf("expected X-Token-Count to be numeric, got %q", tokenCount)
+	}
 }
 
 func TestResponseProcessor_JSONPassThrough_WhenDisabled(t *testing.T) {

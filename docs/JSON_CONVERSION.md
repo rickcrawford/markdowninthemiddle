@@ -1,6 +1,6 @@
 # JSON-to-Markdown Conversion
 
-Convert JSON API responses to clean, structured Markdown using **Mustache templates**. Perfect for feeding API data to Claude and other LLMs.
+Convert JSON API responses to clean, structured Markdown using **Mustache templates** with automatic token counting. Perfect for feeding API data to Claude and other LLMs.
 
 ---
 
@@ -49,6 +49,76 @@ Templates are matched against request URLs using **longest prefix match**:
 | `api.example.com__v1__posts.mustache` | `http://api.example.com/v1/posts*` |
 
 **Note:** URL schemes (`http://`, `https://`) are stripped before matching.
+
+---
+
+## Token Counting
+
+Every JSON-to-Markdown conversion automatically includes **token counting**. This lets you estimate LLM usage and costs before sending content.
+
+### Proxy Response Headers
+
+When using as a reverse proxy, token count is available in the `X-Token-Count` response header:
+
+```bash
+curl -x http://localhost:8080 https://api.github.com/users/octocat -sD - | grep "X-Token-Count"
+# X-Token-Count: 1234
+```
+
+### MCP Server Response
+
+When using as an MCP server, token count is included in the JSON response:
+
+```json
+{
+  "url": "https://api.github.com/users/octocat",
+  "markdown": "# octocat\n\n...",
+  "tokens": 1234,
+  "status_code": 200
+}
+```
+
+### Token Encoding
+
+Tokens are counted using **TikToken** with `cl100k_base` encoding (same as GPT-4/Claude). Configure with:
+
+```bash
+# CLI flag
+./markdowninthemiddle --convert-json --tiktoken-encoding cl100k_base
+
+# Environment
+MITM_CONVERSION_TIKTOKEN_ENCODING="cl100k_base"
+
+# Config file
+conversion:
+  tiktoken_encoding: "cl100k_base"
+```
+
+### Use Cases
+
+**Before sending to Claude:**
+```bash
+curl -x http://localhost:8080 https://api.example.com/data -sD - | \
+  grep "X-Token-Count" | \
+  # Check count before feeding to LLM
+```
+
+**Batch processing with token limits:**
+```bash
+# Only process items under 1000 tokens
+./markdowninthemiddle --convert-json --template-dir ./templates
+
+# Monitor X-Token-Count header to batch requests
+```
+
+**Cost estimation:**
+```bash
+# Estimate Claude API costs before calling
+# Claude: ~$0.003 per 1k tokens (input) [as of 2024]
+token_count=1234
+estimated_cost=$(echo "scale=4; $token_count * 0.003 / 1000" | bc)
+echo "Estimated cost: \$$estimated_cost"
+```
 
 ---
 
@@ -338,11 +408,11 @@ Use unescaped HTML for custom formatting:
 Use JSON conversion in Claude Desktop via MCP:
 
 ```bash
-# Start MCP server with templates
+# Start MCP server with templates and token counting
 ./markdowninthemiddle mcp --convert-json --template-dir ./my-templates
 ```
 
-Claude can now fetch APIs and get beautifully formatted Markdown:
+Claude can now fetch APIs and get beautifully formatted Markdown with token counts:
 
 ```
 User: Can you fetch and summarize https://api.github.com/users/octocat?
@@ -351,7 +421,25 @@ Claude: [Uses fetch_markdown tool with JSON template]
 # octocat
 **ID**: 1 | **Type**: User
 ...
+
+[Response includes: "tokens": 245]
 ```
+
+### Token-Aware Processing
+
+Claude can now make intelligent decisions based on token counts:
+
+```
+User: Fetch all users from https://api.example.com/users and process if under 5000 tokens
+
+Claude:
+1. Calls fetch_markdown(url)
+2. Receives markdown + token count
+3. Checks if tokens < 5000
+4. Processes or requests pagination based on count
+```
+
+See [JSON_CONVERSION.md#Token Counting](./JSON_CONVERSION.md#token-counting) for more details.
 
 ---
 

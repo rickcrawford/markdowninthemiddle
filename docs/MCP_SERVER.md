@@ -174,6 +174,25 @@ Fetch a URL and convert response to Markdown.
 - `application/json` - Formatted as Markdown (with optional Mustache template)
 - Other types - Returned as-is
 
+**Token Counting:**
+The `tokens` field in the response is automatically calculated for all Markdown output (both HTML and JSON conversions). This uses TikToken encoding (`cl100k_base`), the same encoding used by Claude and GPT-4.
+
+Use this to:
+- Estimate LLM usage costs before processing
+- Monitor token consumption in batch operations
+- Stay within token budget limits
+
+**Example: Token-aware processing**
+```
+User: Fetch https://api.example.com/items and tell me how many tokens it would take to process all items
+
+Claude:
+1. Calls fetch_markdown with the URL
+2. Receives response with "tokens": 1234
+3. Calculates cost/feasibility based on token count
+4. Responds with token estimate
+```
+
 ### fetch_raw
 
 Fetch a URL and return the raw response body.
