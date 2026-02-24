@@ -17,6 +17,7 @@ type Config struct {
 	LogLevel    string           `mapstructure:"log_level"`
 	Transport   TransportConfig  `mapstructure:"transport"`
 	Filter      FilterConfig     `mapstructure:"filter"`
+	MITM        MITMConfig       `mapstructure:"mitm"`
 }
 
 type ProxyConfig struct {
@@ -68,6 +69,12 @@ type FilterConfig struct {
 	Allowed []string `mapstructure:"allowed"`
 }
 
+type MITMConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	CertDir  string `mapstructure:"cert_dir"`
+	CertFile string `mapstructure:"cert_file"`
+}
+
 // Load reads configuration from the given file path (or default locations)
 // and environment variables, then unmarshals into a Config struct.
 func Load(cfgFile string) (*Config, error) {
@@ -108,6 +115,8 @@ func Load(cfgFile string) (*Config, error) {
 	viper.SetDefault("transport.type", "http")
 	viper.SetDefault("transport.chromedp.url", "http://localhost:9222")
 	viper.SetDefault("transport.chromedp.pool_size", 5)
+	viper.SetDefault("mitm.enabled", false)
+	viper.SetDefault("mitm.cert_dir", "./certs/mitm")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {

@@ -1,19 +1,23 @@
 package proxy
 
 import (
+	"bufio"
 	"crypto/tls"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"golang.org/x/net/http/httpproxy"
 
 	"github.com/rickcrawford/markdowninthemiddle/internal/cache"
 	"github.com/rickcrawford/markdowninthemiddle/internal/filter"
 	"github.com/rickcrawford/markdowninthemiddle/internal/middleware"
+	"github.com/rickcrawford/markdowninthemiddle/internal/mitm"
 	"github.com/rickcrawford/markdowninthemiddle/internal/output"
 	"github.com/rickcrawford/markdowninthemiddle/internal/templates"
 	"github.com/rickcrawford/markdowninthemiddle/internal/tokens"
@@ -40,6 +44,7 @@ type Options struct {
 	Filter        *filter.Filter
 	Transport     http.RoundTripper
 	TransportType string // "http" or "chrome"
+	MITM          *mitm.Manager
 }
 
 // New creates an *http.Server configured as a forward proxy.
@@ -64,7 +69,15 @@ func New(opts Options) *http.Server {
 	if opts.Transport != nil {
 		innerTransport = opts.Transport
 	} else {
+		// Create HTTP transport respecting environment proxy variables
+		// (HTTP_PROXY, HTTPS_PROXY, NO_PROXY)
+		proxyFuncFromEnv := httpproxy.FromEnvironment().ProxyFunc()
+		proxyFunc := func(req *http.Request) (*url.URL, error) {
+			return proxyFuncFromEnv(req.URL)
+		}
+
 		innerTransport = &http.Transport{
+			Proxy: proxyFunc,
 			TLSClientConfig: &tls.Config{
 				MinVersion:         tls.VersionTLS12,
 				InsecureSkipVerify: opts.TLSInsecure,
@@ -91,7 +104,11 @@ func New(opts Options) *http.Server {
 	// CONNECT handler for HTTPS tunneling.
 	r.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodConnect {
-			handleConnect(w, r)
+			if opts.MITM != nil {
+				handleConnectMITM(w, r, opts.MITM, transport)
+			} else {
+				handleConnect(w, r)
+			}
 			return
 		}
 		handleHTTP(w, r, transport)
@@ -168,6 +185,74 @@ func transfer(dst io.WriteCloser, src io.ReadCloser) {
 	defer dst.Close()
 	defer src.Close()
 	io.Copy(dst, src)
+}
+
+// handleConnectMITM implements HTTPS tunneling with MITM interception.
+// This decrypts HTTPS traffic, allowing responses to be processed (converted,
+// cached, token counted, etc.), then re-encrypts before sending to client.
+func handleConnectMITM(w http.ResponseWriter, req *http.Request, mitmMgr *mitm.Manager, transport http.RoundTripper) {
+	// Get or generate a certificate for this domain
+	cert, err := mitmMgr.GetCertForDomain(req.Host)
+	if err != nil {
+		log.Printf("MITM cert generation failed for %s: %v", req.Host, err)
+		http.Error(w, "certificate generation failed", http.StatusInternalServerError)
+		return
+	}
+
+	// Accept the CONNECT request
+	w.WriteHeader(http.StatusOK)
+
+	// Hijack the client connection
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "hijacking not supported", http.StatusInternalServerError)
+		return
+	}
+
+	clientConn, _, err := hijacker.Hijack()
+	if err != nil {
+		log.Printf("hijack error: %v", err)
+		http.Error(w, "hijack error", http.StatusInternalServerError)
+		return
+	}
+	defer clientConn.Close()
+
+	// Wrap client connection with TLS (present our cert)
+	tlsConn := tls.Server(clientConn, &tls.Config{
+		Certificates: []tls.Certificate{*cert},
+	})
+	defer tlsConn.Close()
+
+	// Read HTTPS requests from the client (decrypted via our cert)
+	reader := bufio.NewReader(tlsConn)
+	for {
+		clientReq, err := http.ReadRequest(reader)
+		if err != nil {
+			if err != io.EOF {
+				log.Printf("MITM read error: %v", err)
+			}
+			break
+		}
+
+		// Rewrite request to upstream
+		clientReq.RequestURI = ""
+		clientReq.URL.Scheme = "https"
+		clientReq.URL.Host = req.Host
+
+		// Remove hop-by-hop headers
+		removeHopByHop(clientReq.Header)
+
+		// Send request to upstream using our transport (with full TLS handshake)
+		upstreamResp, err := transport.RoundTrip(clientReq)
+		if err != nil {
+			log.Printf("MITM upstream error: %v", err)
+			break
+		}
+
+		// Write response back to client (will be encrypted via our TLS)
+		upstreamResp.Write(tlsConn)
+		upstreamResp.Body.Close()
+	}
 }
 
 func removeHopByHop(h http.Header) {

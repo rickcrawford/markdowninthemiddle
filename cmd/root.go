@@ -19,6 +19,7 @@ import (
 	"github.com/rickcrawford/markdowninthemiddle/internal/certs"
 	"github.com/rickcrawford/markdowninthemiddle/internal/config"
 	"github.com/rickcrawford/markdowninthemiddle/internal/filter"
+	"github.com/rickcrawford/markdowninthemiddle/internal/mitm"
 	"github.com/rickcrawford/markdowninthemiddle/internal/output"
 	"github.com/rickcrawford/markdowninthemiddle/internal/proxy"
 	"github.com/rickcrawford/markdowninthemiddle/internal/templates"
@@ -110,6 +111,11 @@ func run(cmd *cobra.Command, args []string) error {
 		cfg.Filter.Allowed = v
 	}
 
+	// Auto-enable MITM if TLS is enabled (no need for separate flag)
+	if cfg.TLS.Enabled {
+		cfg.MITM.Enabled = true
+	}
+
 	// Token counter.
 	tokenCounter, err := tokens.NewCounter(cfg.Conversion.TiktokenEncoding)
 	if err != nil {
@@ -127,20 +133,44 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// TLS config for the proxy listener.
+	// If both TLS and MITM are enabled, use a unified CA certificate that works for both.
 	var tlsCfg *tls.Config
+	var sharedCAPath, sharedKeyPath string // Shared certificate for TLS and MITM
+
 	if cfg.TLS.Enabled {
-		cert, err := certs.LoadOrGenerate(
-			cfg.TLS.CertFile, cfg.TLS.KeyFile,
-			cfg.TLS.AutoCert, cfg.TLS.AutoCertHost, cfg.TLS.AutoCertDir,
-		)
-		if err != nil {
-			return fmt.Errorf("loading TLS certificate: %w", err)
+		var cert tls.Certificate
+		var err error
+
+		// If MITM is also enabled, use a unified CA certificate for both TLS and MITM
+		if cfg.MITM.Enabled && cfg.TLS.CertFile == "" && cfg.TLS.KeyFile == "" && cfg.TLS.AutoCert {
+			// Generate a unified CA certificate that works for both TLS and MITM
+			certDir := cfg.TLS.AutoCertDir
+			sharedCAPath, sharedKeyPath, err = certs.GenerateCA(cfg.TLS.AutoCertHost, certDir)
+			if err != nil {
+				return fmt.Errorf("generating unified CA certificate: %w", err)
+			}
+			cert, err = tls.LoadX509KeyPair(sharedCAPath, sharedKeyPath)
+			if err != nil {
+				return fmt.Errorf("loading unified CA certificate: %w", err)
+			}
+			log.Println("TLS enabled on proxy listener with unified CA certificate (also used for MITM)")
+			log.Println("⚠️  Clients: Trust the CA certificate in " + certDir + " for both TLS and MITM")
+		} else {
+			// Use separate TLS certificate
+			cert, err = certs.LoadOrGenerate(
+				cfg.TLS.CertFile, cfg.TLS.KeyFile,
+				cfg.TLS.AutoCert, cfg.TLS.AutoCertHost, cfg.TLS.AutoCertDir,
+			)
+			if err != nil {
+				return fmt.Errorf("loading TLS certificate: %w", err)
+			}
+			log.Println("TLS enabled on proxy listener")
 		}
+
 		tlsCfg = &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			MinVersion:   tls.VersionTLS12,
 		}
-		log.Println("TLS enabled on proxy listener")
 	}
 
 	// Markdown output writer.
@@ -179,6 +209,29 @@ func run(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("compiling request filter: %w", err)
 		}
 		log.Printf("Request filter enabled with %d pattern(s)", len(cfg.Filter.Allowed))
+	}
+
+	// Initialize MITM manager if enabled
+	var mitmMgr *mitm.Manager
+	if cfg.MITM.Enabled {
+		// If we have a shared CA certificate (from unified TLS+MITM), use that directory
+		mitmCertDir := cfg.MITM.CertDir
+		if sharedCAPath != "" {
+			// Use the TLS certificate directory which now contains the shared CA
+			mitmCertDir = cfg.TLS.AutoCertDir
+		}
+
+		mitmMgr, err = mitm.New(mitmCertDir)
+		if err != nil {
+			return fmt.Errorf("initializing MITM: %w", err)
+		}
+		log.Println("HTTPS MITM interception enabled")
+		log.Printf("CA certificate: %s", mitmMgr.CACertPath())
+		if sharedCAPath != "" {
+			log.Println("✅ Using unified CA certificate (shared with TLS listener)")
+		}
+		log.Println("⚠️  IMPORTANT: Clients must trust this CA certificate to use MITM mode")
+		log.Println("   See MITM_SETUP.md for client setup instructions")
 	}
 
 	// Initialize browser pool if chromedp transport is configured
@@ -227,6 +280,7 @@ func run(cmd *cobra.Command, args []string) error {
 		Filter:        reqFilter,
 		Transport:     chromePool,
 		TransportType: transportType,
+		MITM:          mitmMgr,
 	}
 
 	srv := proxy.New(opts)

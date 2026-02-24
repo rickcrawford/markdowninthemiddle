@@ -11,7 +11,8 @@ proxy:
 # TLS settings
 tls:
   # Enable TLS on the proxy listener
-  enabled: false
+  # When enabled, MITM is automatically activated (no separate flag needed)
+  enabled: true
   # Path to TLS cert file (if not using auto-generated)
   cert_file: ""
   # Path to TLS key file (if not using auto-generated)
@@ -55,16 +56,15 @@ output:
 # Transport settings
 transport:
   # Transport type for fetching upstream content
-  # "http" (default) - standard net/http transport (reverse proxy behavior)
+  # "http" - standard net/http transport (reverse proxy behavior)
   # "chromedp" - headless Chrome via Chrome DevTools Protocol (JavaScript rendering)
-  type: "http"
+  type: "chromedp"
   # chromedp transport configuration (only used when type: "chromedp")
   chromedp:
     # Chrome DevTools Protocol URL
-    # Default: http://localhost:9222
-    # Use Docker: http://chrome:9222 (when running proxy in docker-compose)
-    # Use local Chrome: http://localhost:9222 (if Chrome running on host)
-    url: "http://localhost:9222"
+    # Docker: http://chrome:9222 (service name from docker-compose.yml)
+    # Local: http://localhost:9222 (if Chrome running on host machine)
+    url: "http://chrome:9222"
     # Max concurrent tabs in the browser pool (default: 5)
     pool_size: 5
 

@@ -1,4 +1,6 @@
-# chromedp Browser Transport Guide
+# Optional: JavaScript Rendering with Chromedp
+
+> **Default Transport:** The proxy uses standard HTTP by default, which is simpler and has no external dependencies. Chromedp is an **optional** feature for advanced use cases.
 
 ## Overview
 
@@ -12,8 +14,8 @@
 - ✅ Target sites load data via client-side JavaScript
 - ✅ You need accurate visual rendering
 
-**Use standard HTTP when:**
-- ✅ Simple HTML sites (no JavaScript)
+**Use standard HTTP when (default):**
+- ✅ Simple HTML sites (no JavaScript) - **RECOMMENDED**
 - ✅ Performance is critical (chromedp is slower)
 - ✅ Resource constraints (chromedp uses more memory)
 - ✅ Quick proxying without rendering overhead
@@ -138,22 +140,44 @@
 
 ## Setup Options
 
-### Option 1: Docker Compose (Recommended)
+### Option 0: Default (HTTP Transport)
 
-**Simplest way to get started:**
+**The proxy works out-of-the-box with standard HTTP transport (no Chrome needed):**
 
 ```bash
-# Start Chrome + Proxy
+# Docker Compose (HTTP only)
 docker compose up -d
 
-# Both services start automatically
-# Proxy connects to Chrome internally at http://chrome:9222
+# Local binary
+./markdowninthemiddle
+```
+
+Both start with HTTP transport and work immediately. To enable chromedp, follow options below.
+
+---
+
+### Option 1: Docker Compose with Chromedp
+
+**To enable JavaScript rendering in Docker:**
+
+```bash
+# In docker-compose.yml, uncomment the Chrome service dependency:
+# depends_on:
+#   chrome:
+#     condition: service_healthy
+
+# Set transport to chromedp:
+export MITM_TRANSPORT_TYPE=chromedp
+export MITM_TRANSPORT_CHROMEDP_URL=http://chrome:9222
+
+# Start services
+docker compose up -d
 ```
 
 **What happens:**
 - `chrome` service starts with DevTools Protocol enabled
 - `proxy` service waits for Chrome health check to pass
-- Proxy automatically connects to `http://chrome:9222`
+- Proxy connects to `http://chrome:9222` and uses chromedp for rendering
 
 ### Option 2: Local Chrome (Development)
 
@@ -344,19 +368,26 @@ docker compose up -d
    - Reduce concurrent load
    - Add more Chrome instances (run multiple Docker containers)
 
-### Graceful Fallback
+### If Chrome Connection Fails
 
-**Good news:** If Chrome fails to connect, the proxy automatically falls back to HTTP transport:
+**Important:** Chromedp is optional. If Chrome isn't available:
 
+1. **Use HTTP transport (default)** - No Chrome needed, proxy works immediately
+2. **Don't enable chromedp** - Only set `--transport chromedp` if Chrome is running
+3. **Graceful degradation** - Use multiple environment configs:
+
+```bash
+# Only enable chromedp if Chrome is available
+if [ "$(curl -s http://localhost:9222/json/version)" ]; then
+  export MITM_TRANSPORT_TYPE=chromedp
+else
+  export MITM_TRANSPORT_TYPE=http
+fi
+
+./markdowninthemiddle
 ```
-WARNING: chromedp initialization failed: ...
-FALLBACK: Using standard HTTP transport instead
-To use chromedp, ensure Chrome is running:
-  Docker Compose:  docker compose up -d
-  Local Chrome:    google-chrome --remote-debugging-port=9222
-```
 
-The proxy still works, just without JavaScript rendering.
+Or just use HTTP transport for most use cases.
 
 ## Best Practices
 

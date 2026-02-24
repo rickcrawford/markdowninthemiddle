@@ -9,6 +9,12 @@ services:
     restart: unless-stopped
     environment:
       HEADLESS_SHELL_ARGS: "--no-sandbox --disable-gpu"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "exec 3<>/dev/tcp/127.0.0.1/9222 && echo 'ok' && exec 3>&-"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
     networks:
       - mitm
 
@@ -18,23 +24,26 @@ services:
       dockerfile: Dockerfile
     container_name: markdowninthemiddle-proxy
     ports:
-      - "8080:8080"      # Proxy (HTTP or HTTPS depending on --tls flag)
+      - "8080:8080"      # Proxy (HTTP, chromedp transport enabled by default)
     volumes:
       - ./config.yml:/etc/markdowninthemiddle/config.yml:ro
-      - ./certs:/etc/markdowninthemiddle/certs
+      - ./certs:/app/certs
       - ./output:/var/log/markdowninthemiddle/output
     environment:
       MITM_CONFIG: "/etc/markdowninthemiddle/config.yml"
       MITM_PROXY_ADDR: "0.0.0.0:8080"
       MITM_TLS_ENABLED: "true"
       MITM_TLS_AUTO_CERT: "true"
+      MITM_TLS_AUTO_CERT_HOST: "localhost"
+      MITM_TLS_AUTO_CERT_DIR: "/app/certs"
       MITM_TRANSPORT_TYPE: "chromedp"
-      MITM_TRANSPORT_CHROMEDP_URL: "http://chrome:9222"
       MITM_CONVERSION_ENABLED: "true"
       MITM_LOG_LEVEL: "info"
-    depends_on:
-      chrome:
-        condition: service_started
+      # Note: MITM is automatically enabled when TLS is enabled (no separate flag needed)
+    # Optional: uncomment below to wait for Chrome service if using chromedp transport
+    # depends_on:
+    #   chrome:
+    #     condition: service_healthy
     restart: unless-stopped
     networks:
       - mitm

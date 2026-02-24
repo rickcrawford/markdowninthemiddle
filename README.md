@@ -54,23 +54,23 @@ Inspired by [Cloudflare's Markdown for Agents](https://blog.cloudflare.com/markd
 
 ## Quick Start
 
-### Docker (Recommended - includes Chrome)
+### Docker (Recommended)
 
 ```bash
-# Start proxy + Chrome in Docker
-./scripts/docker-compose.sh start
+# Start proxy + Chrome
+docker compose up -d
 
 # Test it
 curl -x http://localhost:8080 http://example.com
 
 # View logs
-./scripts/docker-compose.sh logs proxy
+docker compose logs -f proxy
 
-# Stop everything
-./scripts/docker-compose.sh stop
+# Stop
+docker compose down
 ```
 
-**Available on:** `http://localhost:8080`
+**Runs on:** `http://localhost:8080` (HTTP, no TLS)
 
 ### macOS/Linux (Binary)
 
@@ -78,242 +78,91 @@ curl -x http://localhost:8080 http://example.com
 # Build from source
 go build -o markdowninthemiddle .
 
-# Start with defaults (HTTP on :8080)
+# Start proxy (HTTP on :8080)
 ./markdowninthemiddle
 
-# With TLS (HTTPS on :8080)
-./markdowninthemiddle --tls --auto-cert
-
-# With content negotiation only
-./markdowninthemiddle --negotiate-only
-
-# With caching
-./markdowninthemiddle --cache-dir ./cache
-
-# With JavaScript rendering (requires Chrome)
-./scripts/start-chrome.sh &
-./markdowninthemiddle --transport chromedp
-```
-
----
-
-## Installation
-
-### Docker Compose (All-in-one)
-
-```bash
-docker compose up -d
-```
-
-Includes:
-- Markdown in the Middle proxy
-- Headless Chrome with DevTools enabled
-- Health checks and auto-restart
-- Certificate generation
-
-### macOS
-
-```bash
-# Via Homebrew (if available)
-brew install markdowninthemiddle
-
-# Or build from source
-git clone https://github.com/rickcrawford/markdowninthemiddle.git
-cd markdowninthemiddle
-go build -o markdowninthemiddle .
-```
-
-### Linux
-
-```bash
-# Via package manager (if available)
-sudo apt install markdowninthemiddle
-
-# Or build from source
-git clone https://github.com/rickcrawford/markdowninthemiddle.git
-cd markdowninthemiddle
-go build -o markdowninthemiddle .
-```
-
-### Windows
-
-```bash
-# Via Chocolatey (if available)
-choco install markdowninthemiddle
-
-# Or build from source
-git clone https://github.com/rickcrawford/markdowninthemiddle.git
-cd markdowninthemiddle
-go build -o markdowninthemiddle.exe .
-```
-
----
-
-## Usage
-
-### HTTP Proxy (Default)
-
-```bash
-# Start proxy on :8080
-./markdowninthemiddle
-
-# Use as proxy
+# Test
 curl -x http://localhost:8080 http://example.com
-
-# Get token count
-curl -x http://localhost:8080 -sD - http://example.com | grep X-Token-Count
-```
-
-### HTTPS Proxy with TLS
-
-#### Quick Start (auto-generated cert)
-
-```bash
-./markdowninthemiddle --tls --auto-cert
-curl -x https://localhost:8080 --insecure http://example.com
-```
-
-#### macOS (Proper Certificate Setup)
-
-**Step 1: Generate certificate**
-```bash
-./markdowninthemiddle gencert --host localhost --dir ./certs
-```
-
-**Step 2: Add to macOS Keychain**
-```bash
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ./certs/cert.pem
-```
-
-**Step 3: Start with TLS**
-```bash
-./markdowninthemiddle --tls
-```
-
-**Step 4: Use with curl (no --insecure needed)**
-```bash
-curl -x https://localhost:8080 http://example.com
-```
-
-### JavaScript Rendering (chromedp)
-
-**Step 1: Start Chrome**
-```bash
-./scripts/start-chrome.sh
-```
-
-**Step 2: Start proxy with chromedp**
-```bash
-./markdowninthemiddle --transport chromedp
-```
-
-**Step 3: Use normally**
-```bash
-curl -x http://localhost:8080 https://spa-website.com
-```
-
-### Content Negotiation Mode
-
-Only convert when client explicitly requests Markdown:
-
-```bash
-./markdowninthemiddle --negotiate-only
-
-# Returns HTML as-is
-curl -x http://localhost:8080 http://example.com
-
-# Returns Markdown
-curl -x http://localhost:8080 -H "Accept: text/markdown" http://example.com
-```
-
-### Request Filtering
-
-Restrict proxy to specific domains:
-
-```bash
-./markdowninthemiddle \
-  --allow "^https://api\.example\.com/" \
-  --allow "^https://docs\.example\.com/"
-
-# Returns 403 Forbidden for other domains
-curl -x http://localhost:8080 http://other-domain.com
-```
-
-### Output Files
-
-Save converted Markdown to disk:
-
-```bash
-./markdowninthemiddle --output-dir ./markdown
-
-# Files named: example.com__path__to__page.md
-ls ./markdown
 ```
 
 ---
 
 ## Configuration
 
-Configuration loads in this order (highest to lowest priority):
+**Default behavior:**
+- HTTP listener (no TLS)
+- HTML → Markdown conversion enabled
+- Token counting enabled
+- JavaScript rendering via chromedp (Docker) or disabled (local)
 
-1. **CLI flags** - `./markdowninthemiddle --tls --cache-dir ./cache`
-2. **Environment variables** - `MITM_TLS_ENABLED=true MITM_CACHE_DIR=./cache`
-3. **config.yml** - Local configuration file
-4. **Built-in defaults**
-
-### config.yml Example
-
-```yaml
-proxy:
-  addr: ":8080"
-  read_timeout: 30s
-  write_timeout: 30s
-
-tls:
-  enabled: false
-  auto_cert: true
-  auto_cert_host: "localhost"
-  auto_cert_dir: "./certs"
-
-conversion:
-  enabled: true
-  tiktoken_encoding: "cl100k_base"
-  negotiate_only: false
-  convert_json: false
-
-cache:
-  enabled: false
-  dir: "./cache"
-  respect_headers: true
-
-output:
-  enabled: false
-  dir: "./markdown-output"
-
-transport:
-  type: "http"  # or "chromedp"
-  chromedp:
-    url: "http://localhost:9222"
-    pool_size: 5
-
-filter:
-  allowed: []  # Empty = allow all
-
-log_level: "info"
+**Common options:**
+```bash
+./markdowninthemiddle --addr :9090              # Custom port
+./markdowninthemiddle --cache-dir ./cache       # Enable caching
+./markdowninthemiddle --output-dir ./markdown   # Save converted files
+./markdowninthemiddle --negotiate-only          # Convert only when requested
+./markdowninthemiddle --mitm                    # HTTPS interception (see docs)
 ```
 
-### Environment Variables
+**See configuration docs:**
+- **[HTTPS_SETUP.md](./HTTPS_SETUP.md)** - Add TLS/HTTPS, MITM mode, certificate setup
+- **[MITM_SETUP.md](./MITM_SETUP.md)** - Client setup for MITM interception
+- **[UPSTREAM_PROXY.md](./UPSTREAM_PROXY.md)** - Route through another proxy
+- **[CODE_DETAILS.md](./CODE_DETAILS.md)** - Full CLI reference and architecture
 
-Prefix with `MITM_` and use `_` for nested keys:
+---
+
+---
+
+## Common Use Cases
+
+**Check response was converted:**
+```bash
+curl -x http://localhost:8080 http://example.com -sD - | grep "X-Token-Count"
+```
+
+**Only convert when requested (Accept header):**
+```bash
+./markdowninthemiddle --negotiate-only
+curl -x http://localhost:8080 -H "Accept: text/markdown" http://example.com
+```
+
+**Restrict to specific domains:**
+```bash
+./markdowninthemiddle --allow "^https://api\.example\.com/" --allow "^https://docs\.example\.com/"
+```
+
+**Save converted Markdown files:**
+```bash
+./markdowninthemiddle --output-dir ./markdown
+```
+
+**Cache responses for repeatable processing:**
+```bash
+./markdowninthemiddle --cache-dir ./cache
+```
+
+---
+
+## Advanced Configuration
+
+**CLI flags, environment variables, or config.yml:**
 
 ```bash
-MITM_PROXY_ADDR=":9090"
-MITM_TLS_ENABLED="true"
-MITM_CACHE_ENABLED="true"
-MITM_CACHE_DIR="./cache"
-MITM_TRANSPORT_TYPE="chromedp"
-MITM_TRANSPORT_CHROMEDP_URL="http://localhost:9222"
+# CLI
+./markdowninthemiddle --addr :9090 --cache-dir ./cache
+
+# Environment
+MITM_PROXY_ADDR=":9090" MITM_CACHE_DIR="./cache" ./markdowninthemiddle
+
+# config.yml
+proxy:
+  addr: ":9090"
+cache:
+  dir: "./cache"
 ```
+
+**Full configuration reference:** See [CODE_DETAILS.md](./CODE_DETAILS.md)
 
 ---
 
@@ -339,8 +188,14 @@ MITM_TRANSPORT_CHROMEDP_URL="http://localhost:9222"
 | Header | Example | Description |
 |--------|---------|-------------|
 | `X-Token-Count` | `1234` | TikToken count of converted Markdown |
+| `X-Transport` | `chromedp` or `http` | Transport used: `chromedp` (headless Chrome) or `http` (standard HTTP) |
 | `Vary` | `accept` | Cache variant header for downstream caches |
 | `Content-Type` | `text/markdown; charset=utf-8` | Converted response type |
+
+**Test response headers:**
+```bash
+curl -x http://localhost:8080 http://example.com -sD - | grep "X-"
+```
 
 ---
 
@@ -390,74 +245,38 @@ MITM_TRANSPORT_CHROMEDP_URL="http://localhost:9222"
 
 ---
 
-## Docker Usage
+## Docker
 
-### Quick Start
-
-```bash
-./scripts/docker-compose.sh start        # Start all services
-./scripts/docker-compose.sh logs proxy   # View proxy logs
-./scripts/docker-compose.sh test         # Run test request
-./scripts/docker-compose.sh stop         # Stop all services
-```
-
-### Helper Script Commands
+The `docker-compose.yml` includes both proxy and Chrome services:
 
 ```bash
-./scripts/docker-compose.sh start        # Start proxy + Chrome
-./scripts/docker-compose.sh stop         # Stop all services
-./scripts/docker-compose.sh restart      # Restart services
-./scripts/docker-compose.sh status       # Show service status
-./scripts/docker-compose.sh logs [svc]   # View logs (proxy/chrome)
-./scripts/docker-compose.sh test         # Test with sample request
-./scripts/docker-compose.sh shell        # Open container shell
-./scripts/docker-compose.sh build        # Rebuild image
-./scripts/docker-compose.sh clean        # Remove all containers
+docker compose up -d          # Start
+docker compose logs -f proxy  # View logs
+docker compose down           # Stop
 ```
 
-### Ports
-
-| Port | Protocol | Service | Purpose |
-|------|----------|---------|---------|
-| 8080 | TCP | Proxy | HTTP or HTTPS (depends on TLS setting) |
-| 9222 | TCP | Chrome | DevTools (internal only) |
+See [CODE_DETAILS.md](./CODE_DETAILS.md) for full Docker configuration options.
 
 ---
 
 ## Troubleshooting
 
-### Chrome Connection Issues
+**Proxy won't start:**
+- Check port 8080 is available: `lsof -i :8080`
+- Check logs: `docker compose logs proxy` or see console output
 
-```bash
-# Check if Chrome is running
-docker compose ps
+**Chrome not connecting (Docker):**
+- Verify Chrome service is running: `docker compose ps`
+- Restart Chrome: `docker compose restart chrome`
 
-# View Chrome logs
-./scripts/docker-compose.sh chrome-logs
+**HTTPS/TLS issues:**
+- See [HTTPS_SETUP.md](./HTTPS_SETUP.md) for certificate setup
 
-# Restart Chrome
-docker compose restart chrome
-```
+**MITM certificate not trusted:**
+- See [MITM_SETUP.md](./MITM_SETUP.md) for client certificate setup
 
-### Certificate Trust Issues (macOS)
-
-```bash
-# Add certificate to Keychain
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ./certs/cert.pem
-
-# Verify it's installed
-security dump-trust-settings -d | grep -i markdown
-```
-
-### High Memory Usage
-
-Reduce Chrome pool size or add memory limits:
-
-```bash
-# In docker-compose.yml
-chrome:
-  mem_limit: 512m
-```
+**Upstream proxy issues:**
+- See [UPSTREAM_PROXY.md](./UPSTREAM_PROXY.md) for proxy environment variables
 
 ---
 
