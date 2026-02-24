@@ -10,14 +10,17 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 
 	"github.com/rickcrawford/markdowninthemiddle/internal/banner"
+	"github.com/rickcrawford/markdowninthemiddle/internal/browser"
 	"github.com/rickcrawford/markdowninthemiddle/internal/config"
 	mcpserver "github.com/rickcrawford/markdowninthemiddle/internal/mcp"
 	"github.com/rickcrawford/markdowninthemiddle/internal/output"
+	"github.com/rickcrawford/markdowninthemiddle/internal/templates"
 	"github.com/rickcrawford/markdowninthemiddle/internal/tokens"
 )
 
@@ -35,7 +38,21 @@ func init() {
 	mcpCmd.Flags().String("mcp-transport", "stdio", "MCP server transport: stdio (Claude Desktop) or http (Streamable HTTP)")
 	mcpCmd.Flags().String("mcp-addr", ":8081", "address for HTTP mode MCP server")
 	mcpCmd.Flags().String("config", "", "config file (default: ./config.yml)")
+	mcpCmd.Flags().String("transport", "", "fetch transport: http (default) or chromedp (headless Chrome rendering)")
+	mcpCmd.Flags().String("chrome-url", "", "Chrome DevTools URL for chromedp transport (default: http://localhost:9222)")
+	mcpCmd.Flags().Int("chrome-pool-size", 0, "max concurrent Chrome tabs (default: 5)")
 	mcpCmd.Flags().Bool("tls-insecure", false, "skip TLS certificate verification for upstream requests")
+	mcpCmd.Flags().String("template-dir", "", "directory containing .mustache template files for JSON conversion")
+	mcpCmd.Flags().Bool("convert-json", false, "enable JSON-to-Markdown conversion via Mustache templates")
+}
+
+func getTLSConfig(insecure bool) *tls.Config {
+	if insecure {
+		return &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+	return nil
 }
 
 func runMCP(cmd *cobra.Command, args []string) error {
@@ -54,12 +71,44 @@ func runMCP(cmd *cobra.Command, args []string) error {
 	mcpTransport, _ := cmd.Flags().GetString("mcp-transport")
 	mcpAddr, _ := cmd.Flags().GetString("mcp-addr")
 
+	// CLI flag overrides for fetch transport
+	if v, _ := cmd.Flags().GetString("transport"); v != "" {
+		if v != "http" && v != "chromedp" {
+			return fmt.Errorf("invalid transport: %s (must be http or chromedp)", v)
+		}
+		cfg.Transport.Type = v
+	}
+	if v, _ := cmd.Flags().GetString("chrome-url"); v != "" {
+		cfg.Transport.Chromedp.URL = v
+	}
+	if v, _ := cmd.Flags().GetInt("chrome-pool-size"); v > 0 {
+		cfg.Transport.Chromedp.PoolSize = v
+	}
+
 	if v, _ := cmd.Flags().GetBool("tls-insecure"); v {
 		cfg.TLS.Insecure = true
 	}
 
 	if cfg.TLS.Insecure {
 		log.Println("WARNING: TLS certificate verification disabled for upstream requests")
+	}
+
+	// CLI flag overrides for templates
+	if v, _ := cmd.Flags().GetString("template-dir"); v != "" {
+		cfg.Conversion.TemplateDir = v
+	}
+	if v, _ := cmd.Flags().GetBool("convert-json"); v {
+		cfg.Conversion.ConvertJSON = true
+	}
+
+	// Load templates if configured
+	var templateStore *templates.Store
+	if cfg.Conversion.TemplateDir != "" {
+		templateStore, err = templates.New(cfg.Conversion.TemplateDir)
+		if err != nil {
+			return fmt.Errorf("loading templates: %w", err)
+		}
+		log.Printf("Mustache templates loaded from: %s", cfg.Conversion.TemplateDir)
 	}
 
 	// Token counter
@@ -78,27 +127,42 @@ func runMCP(cmd *cobra.Command, args []string) error {
 		log.Printf("Markdown output enabled: %s", cfg.Output.Dir)
 	}
 
-	// Create HTTP client with TLS config
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: nil,
-		},
-	}
-	if cfg.TLS.Insecure {
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
+	// Create HTTP client with configured transport
+	var httpClient *http.Client
+	var transport http.RoundTripper
+
+	if cfg.Transport.Type == "chromedp" {
+		chromeURL := cfg.Transport.Chromedp.URL
+		if chromeURL == "" {
+			chromeURL = "http://localhost:9222"
+		}
+		log.Printf("Initializing chromedp browser pool for MCP (URL: %s)", chromeURL)
+		pool, err := browser.New(context.Background(), chromeURL, cfg.Transport.Chromedp.PoolSize, 30*time.Second)
+		if err != nil {
+			log.Printf("Warning: Could not initialize chromedp pool: %v (falling back to HTTP transport)", err)
+			// Fall back to standard HTTP
+			transport = &http.Transport{
+				TLSClientConfig: getTLSConfig(cfg.TLS.Insecure),
+			}
+		} else {
+			transport = pool
+			log.Println("✅ chromedp browser pool ready for MCP requests")
+		}
+	} else {
+		// Standard HTTP transport
+		transport = &http.Transport{
+			TLSClientConfig: getTLSConfig(cfg.TLS.Insecure),
 		}
 	}
 
+	httpClient = &http.Client{Transport: transport}
+
 	// Create MCP server
 	mcpServer := mcpserver.New(mcpserver.Deps{
-		HTTPClient:   httpClient,
-		TokenCounter: tokenCounter,
-		OutputWriter: outputWriter,
+		HTTPClient:    httpClient,
+		TokenCounter:  tokenCounter,
+		OutputWriter:  outputWriter,
+		TemplateStore: templateStore,
 	})
 
 	// Setup graceful shutdown

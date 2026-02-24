@@ -33,6 +33,16 @@ conversion:
   tiktoken_encoding: "cl100k_base"
   # Only convert when client sends Accept: text/markdown (content negotiation mode)
   negotiate_only: false
+  # Set to true to convert JSON responses to Markdown using Mustache templates.
+  # When false, JSON responses are returned as-is.
+  convert_json: false
+  # Directory containing .mustache template files for JSON-to-Markdown conversion.
+  # File naming: use __ (double underscore) as a path separator.
+  # Example: api.example.com__v1__users.mustache matches http://api.example.com/v1/users
+  # _default.mustache is used as the fallback for all unmatched JSON responses.
+  # When template_dir is empty and convert_json is true, templates are auto-generated
+  # from the JSON structure.
+  template_dir: ""
 
 # Response body size limit (bytes). 0 = unlimited.
 max_body_size: 10485760  # 10 MB

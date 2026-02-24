@@ -114,11 +114,34 @@ Request → Filter → Transport → Response Processor → Client
 
 ```
 markdowninthemiddle/
-├── main.go                           # Entry point
-├── config.yml                        # Default configuration
-├── Dockerfile                        # Multi-stage Docker build
-├── docker-compose.yml                # Services (proxy + Chrome)
 ├── go.mod, go.sum                    # Dependencies
+├── README.md                         # Project overview
+├── main.go                           # Entry point
+│
+├── docs/                             # Documentation
+│   ├── HTTPS_SETUP.md                # TLS/HTTPS configuration
+│   ├── CHROMEDP.md                   # JavaScript rendering setup
+│   ├── CODE_DETAILS.md               # This file
+│   ├── DOCKER.md                     # Docker deployment guide
+│   ├── MCP_SERVER.md                 # MCP server integration
+│   ├── MITM_SETUP.md                 # Client certificate setup
+│   ├── MITM_IMPLEMENTATION.md        # MITM technical details
+│   ├── PACKAGING.md                  # Release and packaging
+│   └── UPSTREAM_PROXY.md             # Upstream proxy configuration
+│
+├── docker/                           # Docker configuration
+│   ├── README.md                     # Docker quick start
+│   ├── Dockerfile                    # Multi-stage build
+│   ├── docker-compose.yml            # Services (proxy + Chrome + MCP)
+│   ├── .dockerignore                 # Docker build exclude patterns
+│   └── .env.example                  # Example environment variables
+│
+├── examples/                         # Example configurations
+│   ├── README.md                     # Examples guide
+│   ├── config.example.yml            # Example configuration file
+│   └── mustache-templates/           # JSON-to-Markdown templates
+│       ├── _default.mustache         # Generic JSON template
+│       └── api.github.com__users.mustache  # GitHub API example
 │
 ├── scripts/
 │   ├── start-chrome.sh               # macOS/Linux Chrome launcher
@@ -128,7 +151,11 @@ markdowninthemiddle/
 ├── cmd/
 │   ├── main.go                       # Cobra root command
 │   ├── root.go                       # Proxy startup logic
+│   ├── mcp.go                        # MCP server command
 │   └── gencert.go                    # Certificate generation
+│
+├── certs/                            # Runtime TLS certificates (generated)
+├── output/                           # Runtime markdown output (if enabled)
 │
 └── internal/
     ├── banner/

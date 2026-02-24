@@ -1,7 +1,11 @@
 #!/bin/bash
 # Helper script for managing Docker Compose services (proxy + Chrome)
+# Run from project root: ./scripts/docker-compose.sh [command]
 
 set -e
+
+# Change to docker directory
+cd "$(dirname "$0")/../docker"
 
 COMMAND="${1:-help}"
 

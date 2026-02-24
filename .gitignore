@@ -1,0 +1,87 @@
+# Binaries
+markdowninthemiddle
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+
+# Test binaries
+*.test
+*.out
+
+# Build outputs
+bin/
+dist/
+build/
+
+# Dependency management
+vendor/
+go.sum
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.c9/
+*.jsproj
+*.sln
+.vscode-test/
+
+# Environment and config
+.env
+.env.local
+.env.*.local
+config.yml
+config.local.yml
+
+# Runtime directories
+certs/
+!certs/.gitkeep
+output/
+!output/.gitkeep
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+*.swp
+.cache/
+
+# Docker
+.docker/
+docker/.env
+docker/config.yml
+docker/certs/
+!docker/certs/.gitkeep
+docker/output/
+!docker/output/.gitkeep
+
+# Node/Vue artifacts (if frontend added later)
+node_modules/
+dist/
+npm-debug.log*
+
+# Coverage
+coverage/
+*.cover
+*.coverprofile
+
+# OS specific
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# IDE specific
+*.code-workspace
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.iml

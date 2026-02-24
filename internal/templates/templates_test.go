@@ -136,3 +136,27 @@ func TestNew_InvalidDir(t *testing.T) {
 		t.Fatal("expected error for nonexistent directory")
 	}
 }
+
+func TestStore_Match_SchemeStripping(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create a template file with no scheme (as would come from filename)
+	os.WriteFile(filepath.Join(dir, "api.example.com__users.mustache"), []byte("users-template"), 0644)
+
+	store, err := New(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Match against a full URL with scheme
+	got := store.Match("http://api.example.com/users?page=1")
+	if got != "users-template" {
+		t.Errorf("expected users-template, got %q", got)
+	}
+
+	// Also test with https
+	got = store.Match("https://api.example.com/users/123")
+	if got != "users-template" {
+		t.Errorf("expected users-template with https, got %q", got)
+	}
+}

@@ -21,34 +21,44 @@
  ╚═╝     ╚═╝╚═╝╚═════╝ ╚═════╝ ╚══════╝╚══════╝
 ```
 
-> An HTTPS/HTTP forward proxy that intercepts HTML responses and converts them to Markdown on the fly, with optional JavaScript rendering via headless Chrome.
+**An intelligent forward proxy that converts HTML & JSON to Markdown in real-time, with optional JavaScript rendering for dynamic content.**
+
+Perfect for feeding web content to Claude, local LLMs, and AI agents. Works on internal networks where Cloudflare isn't available.
 
 [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen?style=flat-square)](/)
 
-## Why Markdown in the Middle?
+---
 
-Inspired by [Cloudflare's Markdown for Agents](https://blog.cloudflare.com/markdown-for-agents/), this proxy brings HTML-to-Markdown conversion to **local networks, internal services, and private APIs** where Cloudflare isn't available.
+## ✨ Key Features
 
-### What It Solves
+| Feature | Details |
+|---------|---------|
+| 📄 **HTML to Markdown** | Automatic conversion of all HTML responses |
+| 📋 **JSON to Markdown** | Convert API responses using Mustache templates |
+| 🤖 **MCP Integration** | Expose tools to Claude Desktop and other LLM clients |
+| 🔄 **JavaScript Rendering** | Execute SPAs before conversion (headless Chrome) |
+| 💬 **Token Counting** | Estimate LLM usage with TikToken encoding |
+| 💾 **Caching** | RFC 7234 compliant response caching |
+| 🔐 **HTTPS/TLS** | Full MITM support with certificate handling |
+| 🎯 **Smart Negotiation** | Convert only when client requests `Accept: text/markdown` |
+| 🔍 **URL Filtering** | Restrict proxy to approved domains with regex |
+| 🌐 **Forward Proxy** | Standard HTTP CONNECT tunneling |
 
-- 📄 **Automatic HTML → Markdown conversion** - All HTML responses become clean Markdown
-- 🔐 **Works with self-signed certificates** - Perfect for internal/staging environments
-- 🌐 **Forward proxy architecture** - Route traffic through it without code changes
-- 💬 **Token counting** - Get TikToken counts for LLM usage planning
-- 📦 **Optional JavaScript rendering** - Use headless Chrome for SPA/dynamic content
-- 💾 **Response caching** - RFC 7234 compliant cache with disk persistence
-- 🎯 **Content negotiation** - Only convert when clients request `Accept: text/markdown`
-- 🔍 **Request filtering** - Restrict proxy to specific domain patterns
+---
 
-### Use Cases
+## Use Cases
 
-- **Proxying internal APIs** for use with Claude or other LLMs
-- **Converting web content** for processing by AI agents
-- **Token counting** before feeding HTML to language models
-- **Caching HTML** responses for repeatable processing
-- **Rendering SPAs** with JavaScript execution before conversion
+🧠 **AI & LLMs** - Feed web content to Claude, GPT, and local models. Use MCP for Claude Desktop integration.
+
+🔌 **Internal APIs** - Convert private/staging APIs to Markdown for processing or caching.
+
+💼 **Data Processing** - Extract and normalize JSON responses with custom Mustache templates.
+
+🚀 **SPA Rendering** - Execute JavaScript before conversion for dynamic content.
+
+📊 **Token Planning** - Pre-count tokens before sending content to LLMs for cost estimation.
 
 ---
 
@@ -57,7 +67,8 @@ Inspired by [Cloudflare's Markdown for Agents](https://blog.cloudflare.com/markd
 ### Docker (Recommended)
 
 ```bash
-# Start proxy + Chrome
+# Start proxy + Chrome (from docker/ folder)
+cd docker
 docker compose up -d
 
 # Test it
@@ -87,210 +98,177 @@ curl -x http://localhost:8080 http://example.com
 
 ---
 
-## Configuration
+## 📋 JSON-to-Markdown with Templates
 
-**Default behavior:**
-- HTTP listener (no TLS)
-- HTML → Markdown conversion enabled
-- Token counting enabled
-- JavaScript rendering via chromedp (Docker) or disabled (local)
+Convert API responses to clean Markdown using **Mustache templates**:
 
-**Common options:**
 ```bash
-./markdowninthemiddle --addr :9090              # Custom port
-./markdowninthemiddle --cache-dir ./cache       # Enable caching
-./markdowninthemiddle --output-dir ./markdown   # Save converted files
-./markdowninthemiddle --negotiate-only          # Convert only when requested
-./markdowninthemiddle --mitm                    # HTTPS interception (see docs)
+# Copy example templates
+cp -r examples/mustache-templates ~/my-templates
+
+# Enable JSON conversion
+./markdowninthemiddle --convert-json --template-dir ~/my-templates
+
+# Test with an API
+curl -x http://localhost:8080 https://api.github.com/users/octocat
 ```
 
-**See configuration docs:**
-- **[HTTPS_SETUP.md](./HTTPS_SETUP.md)** - Add TLS/HTTPS, MITM mode, certificate setup
-- **[MITM_SETUP.md](./MITM_SETUP.md)** - Client setup for MITM interception
-- **[UPSTREAM_PROXY.md](./UPSTREAM_PROXY.md)** - Route through another proxy
-- **[CODE_DETAILS.md](./CODE_DETAILS.md)** - Full CLI reference and architecture
+**Template naming:** Use `__` (double underscore) as path separator:
+- `api.example.com__users.mustache` → matches `https://api.example.com/users*`
+- `_default.mustache` → fallback for unmatched JSON
+
+**See:** [JSON_CONVERSION.md](./docs/JSON_CONVERSION.md) - Full template guide with examples
 
 ---
 
+## 🤖 MCP Server (Model Context Protocol)
+
+Expose HTML-to-Markdown conversion as an **LLM tool** using the Model Context Protocol. Perfect for Claude Desktop or other MCP-compatible clients.
+
+### Quick Start - Claude Desktop
+
+```bash
+# Start MCP server in stdio mode (for Claude Desktop)
+./markdowninthemiddle mcp --transport chromedp
+```
+
+Add to `Claude Desktop > Settings > Extensions`:
+```json
+{
+  "mcpServers": {
+    "markdowninthemiddle": {
+      "command": "/path/to/markdowninthemiddle",
+      "args": ["mcp", "--transport", "chromedp"]
+    }
+  }
+}
+```
+
+Then use in Claude conversation:
+```
+Can you fetch and summarize https://example.com?
+```
+
+### Quick Start - HTTP Mode (for Other Clients)
+
+```bash
+# Start MCP HTTP server
+./markdowninthemiddle mcp --transport chromedp --mcp-transport http --mcp-addr :8081
+
+# Or in Docker with both proxy and MCP
+docker compose up -d
+```
+
+### Tools
+
+**`fetch_markdown`** - Fetch a URL and convert to Markdown
+```json
+{
+  "url": "https://example.com"
+}
+```
+Returns Markdown, token count, and HTTP status.
+
+**`fetch_raw`** - Fetch a URL and return raw HTML/JSON body
+```json
+{
+  "url": "https://api.example.com/data"
+}
+```
+Returns raw body with content type and status.
+
+### Configuration
+
+**Command-line flags:**
+```bash
+./markdowninthemiddle mcp \
+  --transport chromedp              # http or chromedp
+  --chrome-url http://chrome:9222   # Chrome DevTools URL
+  --chrome-pool-size 10             # Max concurrent tabs
+  --mcp-transport http              # stdio or http
+  --mcp-addr :8081                  # HTTP server address
+```
+
+**Config file (config.yml):**
+```yaml
+transport:
+  type: chromedp                     # or http
+  chromedp:
+    url: http://localhost:9222
+    pool_size: 5
+```
+
+**Docker Compose (both proxy + MCP):**
+```bash
+docker compose up -d
+# Proxy: http://localhost:8080
+# MCP:   http://localhost:8081
+```
+
 ---
 
-## Common Use Cases
+## 📚 Complete Documentation
 
-**Check response was converted:**
-```bash
-curl -x http://localhost:8080 http://example.com -sD - | grep "X-Token-Count"
-```
+| Guide | Purpose |
+|-------|---------|
+| **[CONFIGURATION.md](./docs/CONFIGURATION.md)** | All CLI flags, env vars, and config.yml options |
+| **[JSON_CONVERSION.md](./docs/JSON_CONVERSION.md)** | JSON templates, Mustache syntax, examples |
+| **[CHROMEDP.md](./docs/CHROMEDP.md)** | JavaScript rendering and headless Chrome setup |
+| **[HTTPS_SETUP.md](./docs/HTTPS_SETUP.md)** | TLS, certificates, and HTTPS interception |
+| **[MITM_SETUP.md](./docs/MITM_SETUP.md)** | Client certificate installation and MITM |
+| **[DOCKER.md](./docs/DOCKER.md)** | Docker deployment and multi-service setup |
+| **[MCP_SERVER.md](./docs/MCP_SERVER.md)** | Claude Desktop and LLM integration |
+| **[TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)** | Common issues and solutions |
+| **[CODE_DETAILS.md](./docs/CODE_DETAILS.md)** | Technical architecture and implementation |
 
-**Only convert when requested (Accept header):**
-```bash
-./markdowninthemiddle --negotiate-only
-curl -x http://localhost:8080 -H "Accept: text/markdown" http://example.com
-```
+---
 
-**Restrict to specific domains:**
-```bash
-./markdowninthemiddle --allow "^https://api\.example\.com/" --allow "^https://docs\.example\.com/"
-```
+## ⚙️ Quick Configuration
 
-**Save converted Markdown files:**
-```bash
-./markdowninthemiddle --output-dir ./markdown
-```
+See [CONFIGURATION.md](./docs/CONFIGURATION.md) for the full reference.
 
-**Cache responses for repeatable processing:**
 ```bash
+# Custom port
+./markdowninthemiddle --addr :9090
+
+# Enable caching
 ./markdowninthemiddle --cache-dir ./cache
+
+# Save Markdown files
+./markdowninthemiddle --output-dir ./markdown
+
+# JavaScript rendering
+./markdowninthemiddle --transport chromedp
+
+# HTTPS + MITM
+./markdowninthemiddle --tls --auto-cert
+
+# Restrict domains
+./markdowninthemiddle --allow "^https://api\.example\.com/"
 ```
 
----
-
-## Advanced Configuration
-
-**CLI flags, environment variables, or config.yml:**
-
-```bash
-# CLI
-./markdowninthemiddle --addr :9090 --cache-dir ./cache
-
-# Environment
-MITM_PROXY_ADDR=":9090" MITM_CACHE_DIR="./cache" ./markdowninthemiddle
-
-# config.yml
-proxy:
-  addr: ":9090"
-cache:
-  dir: "./cache"
-```
-
-**Full configuration reference:** See [CODE_DETAILS.md](./CODE_DETAILS.md)
+All options support CLI flags, environment variables (`MITM_*`), or `config.yml`.
 
 ---
 
-## Features
+## About
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| HTML → Markdown | ✅ | Automatic for all `text/html` responses |
-| Token Counting | ✅ | TikToken `cl100k_base` encoding |
-| Content Negotiation | ✅ | `Accept: text/markdown` header support |
-| TLS/HTTPS | ✅ | Auto-generated or custom certificates |
-| Response Caching | ✅ | RFC 7234 compliant with disk persistence |
-| JavaScript Rendering | ✅ | Via headless Chrome (chromedp) |
-| Request Filtering | ✅ | Regex-based domain allowlists |
-| Forward Proxy | ✅ | Standard HTTP CONNECT tunneling |
-| Markdown Output | ✅ | Save converted files to disk |
-| Multi-platform | ✅ | macOS, Linux, Windows |
+**Markdown in the Middle** is inspired by [Cloudflare's Markdown for Agents](https://blog.cloudflare.com/markdown-for-agents/). While Cloudflare's solution handles the edge, this project brings HTML-to-Markdown conversion to:
+
+- 🏢 Internal networks and private services
+- 🔒 Staging/testing environments with self-signed certs
+- 🤖 Local LLM deployments
+- 🔌 Private APIs without external dependencies
+
+It's production-ready with full Docker support, MCP integration for Claude Desktop, and optional JavaScript rendering for dynamic content.
 
 ---
 
-## Response Headers
+## Author
 
-| Header | Example | Description |
-|--------|---------|-------------|
-| `X-Token-Count` | `1234` | TikToken count of converted Markdown |
-| `X-Transport` | `chromedp` or `http` | Transport used: `chromedp` (headless Chrome) or `http` (standard HTTP) |
-| `Vary` | `accept` | Cache variant header for downstream caches |
-| `Content-Type` | `text/markdown; charset=utf-8` | Converted response type |
+**Rick Crawford** - [GitHub](https://github.com/rickcrawford) | [Website](https://rickcrawford.dev)
 
-**Test response headers:**
-```bash
-curl -x http://localhost:8080 http://example.com -sD - | grep "X-"
-```
-
----
-
-## Architecture
-
-```
-┌─────────────┐
-│ HTTP Client │
-└──────┬──────┘
-       │
-       ▼
-┌──────────────────────┐
-│  Proxy Listener      │
-│  :8080 (HTTP/HTTPS)  │
-└──────┬───────────────┘
-       │
-       ▼
-┌──────────────────────┐
-│ Request Filter       │ ◄─ Optional: regex allow-list
-└──────┬───────────────┘
-       │
-       ▼
-┌──────────────────────┐
-│ Transport Layer      │ ◄─ http OR chromedp
-├──────────────────────┤
-│ • Standard HTTP      │
-│ • Headless Chrome    │
-└──────┬───────────────┘
-       │
-       ▼
-┌──────────────────────┐
-│ Response Processing  │
-├──────────────────────┤
-│ • Decompress body    │
-│ • Cache HTML (opt)   │
-│ • Convert HTML→MD    │
-│ • Count tokens       │
-│ • Write files (opt)  │
-└──────┬───────────────┘
-       │
-       ▼
-┌─────────────────┐
-│ HTTP Response   │
-│ (Markdown)      │
-└─────────────────┘
-```
-
----
-
-## Docker
-
-The `docker-compose.yml` includes both proxy and Chrome services:
-
-```bash
-docker compose up -d          # Start
-docker compose logs -f proxy  # View logs
-docker compose down           # Stop
-```
-
-See [CODE_DETAILS.md](./CODE_DETAILS.md) for full Docker configuration options.
-
----
-
-## Troubleshooting
-
-**Proxy won't start:**
-- Check port 8080 is available: `lsof -i :8080`
-- Check logs: `docker compose logs proxy` or see console output
-
-**Chrome not connecting (Docker):**
-- Verify Chrome service is running: `docker compose ps`
-- Restart Chrome: `docker compose restart chrome`
-
-**HTTPS/TLS issues:**
-- See [HTTPS_SETUP.md](./HTTPS_SETUP.md) for certificate setup
-
-**MITM certificate not trusted:**
-- See [MITM_SETUP.md](./MITM_SETUP.md) for client certificate setup
-
-**Upstream proxy issues:**
-- See [UPSTREAM_PROXY.md](./UPSTREAM_PROXY.md) for proxy environment variables
-
----
-
-## Inspiration
-
-This project was inspired by [Cloudflare's Markdown for Agents](https://blog.cloudflare.com/markdown-for-agents/) — an excellent solution for converting web content to Markdown at the edge. Markdown in the Middle brings similar benefits to local networks, internal services, and private APIs that can't use Cloudflare, with the added bonus of optional JavaScript rendering via headless Chrome.
-
----
-
-## See Also
-
-- **[CODE_DETAILS.md](./CODE_DETAILS.md)** - Technical architecture, CLI reference, and implementation details
-- **[CHROMEDP.md](./CHROMEDP.md)** - Detailed chromedp/JavaScript rendering setup
-- **[DOCKER.md](./DOCKER.md)** - Docker deployment guide
+Building tools for AI integration, local LLM workflows, and intelligent content processing. Open to collaboration on AI-adjacent projects.
 
 ---
 
@@ -299,22 +277,23 @@ This project was inspired by [Cloudflare's Markdown for Agents](https://blog.clo
 Contributions welcome! Please:
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-thing`)
 3. Add tests for new functionality
 4. Submit a pull request
+
+See [CLAUDE.md](./CLAUDE.md) for development guidelines.
+
+---
+
+## Support
+
+- 📖 **Documentation** - See the [docs](./docs) folder for comprehensive guides
+- 🐛 **Bug Reports** - [GitHub Issues](https://github.com/rickcrawford/markdowninthemiddle/issues)
+- 💬 **Discussions** - [GitHub Discussions](https://github.com/rickcrawford/markdowninthemiddle/discussions)
+- 🔧 **Quick Help** - Start with [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)
 
 ---
 
 ## License
 
-MIT - See [LICENSE](LICENSE) for details
-
----
-
-## Author
-
-Created by [Rick Crawford](https://github.com/rickcrawford)
-
-## Support
-
-For issues, questions, or feature requests: [GitHub Issues](https://github.com/rickcrawford/markdowninthemiddle/issues)
+MIT License - See [LICENSE](LICENSE) for details

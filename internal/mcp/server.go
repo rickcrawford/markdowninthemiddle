@@ -60,7 +60,7 @@ func RegisterTools(s *server.MCPServer, handler *Handler) {
 	s.AddTool(
 		mcp.Tool{
 			Name:        "fetch_markdown",
-			Description: "Fetch a URL and convert to Markdown",
+			Description: "Fetch a URL and convert to Markdown with JavaScript rendering",
 			InputSchema: mcp.ToolInputSchema(mcp.ToolArgumentsSchema{
 				Type: "object",
 				Properties: map[string]any{
@@ -102,7 +102,7 @@ func (h *Handler) handleFetchMarkdown(ctx context.Context, request mcp.CallToolR
 		return mcp.NewToolResultError("url is required"), nil
 	}
 
-	// Fetch the content
+	// Fetch the content using configured transport (http or chromedp)
 	resp, err := h.httpClient.Get(url)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Error fetching URL: %v", err)), nil
@@ -176,7 +176,7 @@ func (h *Handler) handleFetchRaw(ctx context.Context, request mcp.CallToolReques
 		return mcp.NewToolResultError("url is required"), nil
 	}
 
-	// Fetch the content
+	// Fetch the content using configured transport (http or chromedp)
 	resp, err := h.httpClient.Get(url)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Error fetching URL: %v", err)), nil

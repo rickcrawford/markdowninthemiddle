@@ -20,15 +20,15 @@ services:
 
   proxy:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: markdowninthemiddle-proxy
     ports:
       - "8080:8080"      # Proxy (HTTP, chromedp transport enabled by default)
     volumes:
-      - ./config.yml:/etc/markdowninthemiddle/config.yml:ro
-      - ./certs:/app/certs
-      - ./output:/var/log/markdowninthemiddle/output
+      - ../examples/config.example.yml:/etc/markdowninthemiddle/config.yml:ro
+      - ../certs:/app/certs
+      - ../output:/var/log/markdowninthemiddle/output
     environment:
       MITM_CONFIG: "/etc/markdowninthemiddle/config.yml"
       MITM_PROXY_ADDR: "0.0.0.0:8080"
@@ -52,6 +52,33 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: markdowninthemiddle-mcp
+    ports:
+      - "8081:8081"        # MCP HTTP server
+    volumes:
+      - ../examples/config.example.yml:/etc/markdowninthemiddle/config.yml:ro
+      - ../certs:/app/certs
+      - ../output:/var/log/markdowninthemiddle/output
+    environment:
+      MITM_CONFIG: "/etc/markdowninthemiddle/config.yml"
+      MITM_TRANSPORT_TYPE: "chromedp"
+      MITM_LOG_LEVEL: "info"
+    entrypoint: ["./markdowninthemiddle", "mcp", "--transport", "chromedp", "--mcp-transport", "http", "--mcp-addr", "0.0.0.0:8081"]
+    restart: unless-stopped
+    networks:
+      - mitm
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - chrome
 
 networks:
   mitm:
