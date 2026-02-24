@@ -1,0 +1,56 @@
+# Markdown in the Middle - HTTPS Proxy Configuration
+
+# Proxy listener settings
+proxy:
+  # Address to listen on
+  addr: ":8080"
+  # Read/write timeouts
+  read_timeout: 30s
+  write_timeout: 30s
+
+# TLS settings
+tls:
+  # Enable TLS on the proxy listener
+  enabled: false
+  # Path to TLS cert file (if not using auto-generated)
+  cert_file: ""
+  # Path to TLS key file (if not using auto-generated)
+  key_file: ""
+  # Auto-generate a self-signed certificate
+  auto_cert: true
+  # Self-signed cert options
+  auto_cert_host: "localhost"
+  auto_cert_dir: "./certs"
+  # Skip TLS certificate verification for upstream requests
+  insecure: false
+
+# Conversion settings
+conversion:
+  # Enable HTML to Markdown conversion
+  enabled: true
+  # TikToken encoding for token counting
+  tiktoken_encoding: "cl100k_base"
+  # Only convert when client sends Accept: text/markdown (content negotiation mode)
+  negotiate_only: false
+
+# Response body size limit (bytes). 0 = unlimited.
+max_body_size: 10485760  # 10 MB
+
+# Cache settings
+cache:
+  # Enable response caching
+  enabled: false
+  # Directory to store cached HTML files
+  dir: ""
+  # Respect RFC cache-control headers
+  respect_headers: true
+
+# Output settings - write converted Markdown to files
+output:
+  # Enable writing Markdown output files
+  enabled: false
+  # Directory to write .md files (file-safe names derived from URL)
+  dir: ""
+
+# Logging
+log_level: "info"
