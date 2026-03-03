@@ -1,0 +1,113 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: windows
+            arch: amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          COMMIT=${GITHUB_SHA:0:7}
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+          LDFLAGS="-X github.com/rickcrawford/markdowninthemiddle/cmd.Version=${VERSION} -X github.com/rickcrawford/markdowninthemiddle/cmd.Commit=${COMMIT} -X github.com/rickcrawford/markdowninthemiddle/cmd.BuildDate=${BUILD_DATE}"
+
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            go build -ldflags "$LDFLAGS" -o markdowninthemiddle.exe .
+          else
+            go build -ldflags "$LDFLAGS" -o markdowninthemiddle .
+          fi
+
+      - name: Create archive (Linux/macOS)
+        if: matrix.os != 'windows'
+        run: |
+          mkdir -p archive/markdowninthemiddle
+          cp markdowninthemiddle archive/markdowninthemiddle/
+          cp -r examples archive/markdowninthemiddle/ || true
+          cp -r docs archive/markdowninthemiddle/ || true
+          cp README.md LICENSE archive/markdowninthemiddle/ || true
+          ln -s markdowninthemiddle archive/markdowninthemiddle/mitm
+          cd archive
+          tar -czf ../markdowninthemiddle-${{ matrix.os }}-${{ matrix.arch }}.tar.gz markdowninthemiddle/
+          cd ..
+
+      - name: Create archive (Windows)
+        if: matrix.os == 'windows'
+        run: |
+          mkdir -p archive/markdowninthemiddle
+          cp markdowninthemiddle.exe archive/markdowninthemiddle/
+          cp -r examples archive/markdowninthemiddle/ || true
+          cp -r docs archive/markdowninthemiddle/ || true
+          cp README.md LICENSE archive/markdowninthemiddle/ || true
+          cd archive
+          Compress-Archive -Path markdowninthemiddle -DestinationPath ../markdowninthemiddle-windows-amd64.zip
+          cd ..
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: builds-${{ matrix.os }}-${{ matrix.arch }}
+          path: markdowninthemiddle*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          cp artifacts/builds-*/* release/ || true
+          cd release
+          sha256sum * > SHA256SUMS
+          cd ..
+
+      - name: Download install scripts
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/rickcrawford/markdowninthemiddle/main/install.sh -o release/install.sh
+          curl -fsSL https://raw.githubusercontent.com/rickcrawford/markdowninthemiddle/main/install-latest.sh -o release/install-latest.sh
+          chmod +x release/install.sh release/install-latest.sh
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

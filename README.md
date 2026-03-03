@@ -21,11 +21,33 @@
  ╚═╝     ╚═╝╚═╝╚═════╝ ╚═════╝ ╚══════╝╚══════╝
 ```
 
-**A local proxy that converts websites and APIs to clean Markdown. Perfect for feeding content to Claude, local LLMs, and AI agents.**
+**A local proxy that converts websites and APIs to clean Markdown.**
 
-Try it in 2 minutes with Docker or Go. Convert HTML pages, JSON APIs, and dynamic sites. Get token counts for LLM budgeting.
+Try it in 2 minutes with Docker. Convert HTML pages, JSON APIs, and dynamic sites. Get token counts for LLM budgeting.
 
 By [Rick Crawford](https://github.com/rickcrawford) | [MIT License](LICENSE)
+
+---
+
+## 📦 Install
+
+**Quick install to current directory:**
+```bash
+curl -fsSL "https://github.com/rickcrawford/markdowninthemiddle/releases/latest/download/install.sh" | bash
+```
+
+**Install to `/usr/local/bin/` (system-wide):**
+```bash
+curl -fsSL "https://github.com/rickcrawford/markdowninthemiddle/releases/latest/download/install.sh" | bash -s /usr/local/bin
+```
+
+**Install specific version:**
+```bash
+curl -fsSL "https://github.com/rickcrawford/markdowninthemiddle/releases/download/v0.1.0/markdowninthemiddle-linux-amd64.tar.gz" | tar -xz
+./markdowninthemiddle/markdowninthemiddle --help
+```
+
+**Or download manually** from [GitHub Releases](https://github.com/rickcrawford/markdowninthemiddle/releases).
 
 ---
 
