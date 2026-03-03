@@ -61,12 +61,13 @@ jobs:
 
       - name: Create archive (Windows)
         if: matrix.os == 'windows'
+        shell: pwsh
         run: |
           mkdir -p archive/markdowninthemiddle
           cp markdowninthemiddle.exe archive/markdowninthemiddle/
-          cp -r examples archive/markdowninthemiddle/ || true
-          cp -r docs archive/markdowninthemiddle/ || true
-          cp README.md LICENSE archive/markdowninthemiddle/ || true
+          cp -r examples archive/markdowninthemiddle/ -ErrorAction SilentlyContinue
+          cp -r docs archive/markdowninthemiddle/ -ErrorAction SilentlyContinue
+          cp README.md, LICENSE archive/markdowninthemiddle/
           cd archive
           Compress-Archive -Path markdowninthemiddle -DestinationPath ../markdowninthemiddle-windows-amd64.zip
           cd ..
