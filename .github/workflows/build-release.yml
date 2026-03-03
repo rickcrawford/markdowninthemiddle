@@ -19,8 +19,6 @@ jobs:
             arch: amd64
           - os: darwin
             arch: arm64
-          - os: windows
-            arch: amd64
 
     steps:
       - uses: actions/checkout@v4
@@ -57,19 +55,6 @@ jobs:
           ln -s markdowninthemiddle archive/markdowninthemiddle/mitm
           cd archive
           tar -czf ../markdowninthemiddle-${{ matrix.os }}-${{ matrix.arch }}.tar.gz markdowninthemiddle/
-          cd ..
-
-      - name: Create archive (Windows)
-        if: matrix.os == 'windows'
-        shell: pwsh
-        run: |
-          mkdir -p archive/markdowninthemiddle
-          cp markdowninthemiddle.exe archive/markdowninthemiddle/
-          cp -r examples archive/markdowninthemiddle/ -ErrorAction SilentlyContinue
-          cp -r docs archive/markdowninthemiddle/ -ErrorAction SilentlyContinue
-          cp README.md, LICENSE archive/markdowninthemiddle/
-          cd archive
-          Compress-Archive -Path markdowninthemiddle -DestinationPath ../markdowninthemiddle-windows-amd64.zip
           cd ..
 
       - name: Upload artifacts
