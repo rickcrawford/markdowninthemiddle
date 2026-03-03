@@ -21,11 +21,32 @@
  ╚═╝     ╚═╝╚═╝╚═════╝ ╚═════╝ ╚══════╝╚══════╝
 ```
 
+[![GitHub Stars](https://img.shields.io/github/stars/rickcrawford/markdowninthemiddle?style=flat-square&label=Stars&color=blue)](https://github.com/rickcrawford/markdowninthemiddle)
+[![MIT License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/rickcrawford/markdowninthemiddle?style=flat-square&color=orange)](https://github.com/rickcrawford/markdowninthemiddle/releases)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/rickcrawford/markdowninthemiddle?style=flat-square)](go.mod)
+
 **A local proxy that converts websites and APIs to clean Markdown.**
 
 Try it in 2 minutes with Docker. Convert HTML pages, JSON APIs, and dynamic sites. Get token counts for LLM budgeting.
 
 By [Rick Crawford](https://github.com/rickcrawford) | [MIT License](LICENSE)
+
+---
+
+## Keywords
+`html-to-markdown` • `api-to-markdown` • `content-conversion` • `llm-proxy` • `token-counting` • `markdown-conversion` • `local-proxy` • `claude-integration` • `mcp-tools` • `web-scraping` • `markdown-generation` • `mitm-proxy`
+
+---
+
+## Table of Contents
+- [Install](#-install)
+- [Get Started](#-get-started-in-2-minutes)
+- [What It Does](#-what-it-does)
+- [Examples](#-try-these-examples)
+- [Features](#-features)
+- [Use Cases](#use-cases)
+- [Learn More](#-learn-more)
 
 ---
 
@@ -113,6 +134,28 @@ curl -x http://localhost:8080 https://example.com -sD - | grep X-Token-Count
 
 ---
 
+## Use Cases
+
+**Private API Documentation**
+Convert internal API responses to clean markdown for Claude or other LLMs without exposing raw JSON or sending data through third-party services.
+
+**Local LLM Development**
+Run locally with private documents and internal services. No internet dependency, no data leakage. Perfect for offline LLM workflows.
+
+**Claude Desktop Integration**
+Add MCP tools so Claude Desktop can fetch, convert, and analyze URLs locally with full markdown formatting and token counting.
+
+**Web Content for LLM Context**
+Convert website content to markdown before feeding it to language models. Save token budgets with accurate token counting.
+
+**Internal Network Crawling**
+Access internal documentation, staging sites, and self-signed HTTPS endpoints without going through public proxies.
+
+**Multi-Format Content Processing**
+Handle HTML pages, JSON APIs, and dynamic JavaScript-rendered sites all through one local proxy interface.
+
+---
+
 ## 📚 Learn More
 
 | Guide | For |
@@ -127,12 +170,14 @@ curl -x http://localhost:8080 https://example.com -sD - | grep X-Token-Count
 
 ## About
 
-Built with Go, inspired by [Cloudflare's Markdown for Agents](https://blog.cloudflare.com/markdown-for-agents/). Brings HTML-to-Markdown conversion to:
+Built with Go, inspired by [Cloudflare's Markdown for Agents](https://blog.cloudflare.com/markdown-for-agents/). Unlike cloud-based markdown conversion services or web scraping libraries, Markdown in the Middle is a **local HTTPS proxy** that runs on your machine. It converts HTML pages and JSON APIs to clean markdown with token counting, enabling secure processing of private content.
 
+### Perfect For:
 - 🏢 Internal networks and private services
-- 🔒 Staging/testing environments with self-signed certs
-- 🤖 Local LLM deployments
-- 🔌 Private APIs without external dependencies
+- 🔒 Staging/testing environments with self-signed certificates
+- 🤖 Local LLM deployments and offline AI workflows
+- 🔌 Private APIs and proprietary content without external dependencies
+- 🛡️ Organizations with data privacy and security requirements
 
 ## Author
 
