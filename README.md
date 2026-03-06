@@ -34,11 +34,6 @@ By [Rick Crawford](https://github.com/rickcrawford) | [MIT License](LICENSE)
 
 ---
 
-## Keywords
-`html-to-markdown` • `api-to-markdown` • `content-conversion` • `llm-proxy` • `token-counting` • `markdown-conversion` • `local-proxy` • `claude-integration` • `mcp-tools` • `web-scraping` • `markdown-generation` • `mitm-proxy`
-
----
-
 ## Table of Contents
 - [Install](#-install)
 - [Get Started](#-get-started-in-2-minutes)
